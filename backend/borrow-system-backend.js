@@ -139,7 +139,7 @@ app.get('/items', (req, res) => {
         // ปรับแต่ง URL รูปภาพให้สมบูรณ์ เพื่อให้ Frontend นำไปใช้ได้ทันที
         const updatedResults = results.map(item => ({
             ...item,
-            image_url: `http://localhost:3000/uploads/${item.image_url}`
+            image_url: `http://localhost:5000/uploads/${item.image_url}`
         }));
 
         res.json(updatedResults);
@@ -550,6 +550,37 @@ app.delete('/delete-item/:id', (req, res) => {
         }
 
         res.json({ message: "ลบอุปกรณ์เรียบร้อยแล้ว!" });
+    });
+});
+
+// 1. สำหรับดูประวัติทั้งหมด (ย้ายกลับมาเป็นแบบไม่มี :id)
+app.get('/admin/logs-all', (req, res) => {
+    const sql = `
+        SELECT logs.*, items.item_name, employees.first_name, employees.last_name 
+        FROM borrowing_logs logs
+        JOIN items ON logs.item_id = items.item_id
+        JOIN employees ON logs.employee_id = employees.id 
+        ORDER BY logs.borrow_date DESC
+    `;
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// 2. สำหรับดูเฉพาะรายการ (ถ้าต้องการดู Log รายใบจริงๆ)
+app.get('/admin/logs/single/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = `
+        SELECT logs.*, items.item_name, employees.first_name, employees.last_name 
+        FROM borrowing_logs logs
+        JOIN items ON logs.item_id = items.item_id
+        JOIN employees ON logs.employee_id = employees.id 
+        WHERE logs.log_id = ? 
+    `;
+    db.query(sql, [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results[0]); // ส่งกลับแค่ออบเจกต์เดียว
     });
 });
 
