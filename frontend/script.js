@@ -28,19 +28,37 @@ async function fetchItems(page = 1) {
     }
 }
 
-// 2. ฟังก์ชันสร้างการ์ดอุปกรณ์
+
+function getCategoryName(catId) {
+    const categories = {
+        1: 'Laptop / Computer',
+        2: 'เครื่องเย็บกระดาษ / อุปกรณ์สำนักงาน',
+        3: 'Switch / Network',
+        4: 'อื่นๆ'
+    };
+    return categories[Number(catId)] || 'ไม่ระบุ';
+}
+
+// 2. ปรับปรุงฟังก์ชันสร้างการ์ดอุปกรณ์
 function displayItems(items) {
     const container = document.getElementById('itemContainer');
     container.innerHTML = '';
 
+    // เพิ่มการตรวจสอบเผื่อกรณีไม่มีข้อมูล
+    if (!items || items.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center text-muted"><h5>ไม่พบข้อมูลอุปกรณ์</h5></div>';
+        return;
+    }
+
     items.forEach(item => {
-        let actionButton = ''; // ประกาศตัวแปรไว้ก่อน
+        let actionButton = ''; 
+
+        // ดึงชื่อประเภทโดยใช้ฟังก์ชันแปลง ID ที่เราเตรียมไว้
+        const categoryDisplay = item.category_display_name || 'ไม่ระบุ';
 
         if (item.status === 'Available') {
-            // ปุ่มตอนสถานะ "ว่าง"
             actionButton = `<button class="btn btn-outline-primary w-100" onclick="openBorrowModal('${item.item_id}')">ทำรายการยืม</button>`;
         } else {
-            // ปุ่มตอนสถานะ "ถูกยืม" (เพิ่ม findLogAndReturn)
             actionButton = `
                 <div class="d-flex align-items-center justify-content-between mb-2">
                     <span class="badge bg-danger">ถูกยืม</span>
@@ -51,10 +69,10 @@ function displayItems(items) {
             `;
         }
 
-        // จัดการเรื่อง Path รูปภาพ
-        const imageUrl = item.image_url.startsWith('http')
+        // จัดการเรื่อง Path รูปภาพ (ประกาศตัวแปรให้ถูกต้องก่อนใช้งาน)
+        const imageUrl = (item.image_url && item.image_url.startsWith('http'))
             ? item.image_url
-            : `${API_URL}/uploads/${item.image_url}`;
+            : `${API_URL}/uploads/${item.image_url || 'default.jpg'}`;
 
         const cardHtml = `
             <div class="col-md-4 mb-4">
@@ -62,13 +80,14 @@ function displayItems(items) {
                     <img src="${imageUrl}" class="card-img-top p-3" alt="Device Image" style="height: 200px; object-fit: contain;">
                     <div class="card-body">
                         <h5 class="card-title text-primary">${item.item_name}</h5>
-                        <p class="card-text text-muted mb-1">ประเภท: ${item.item_type || 'ไม่ระบุ'}</p>
+                        
+                        <p class="card-text text-muted mb-1">ประเภท: ${categoryDisplay}</p>
+                        
                         <p class="card-text small mb-0">Asset: ${item.asset_number || '-'}</p>
                         <p class="card-text small mb-0">Serial: ${item.serial_number || '-'}</p>
-                        
                         <p class="card-text mb-1" style="font-size: 0.9rem; color: #000000 !important;">
                             <b style="color: #000000;">เลขที่สัญญา:</b> 
-                            <span style="color: #000000 !important; text-decoration: none;">
+                            <span style="color: #000000 !important;">
                                 ${item.contract_number || 'ไม่มีข้อมูล'}
                             </span>
                         </p>
@@ -82,6 +101,7 @@ function displayItems(items) {
         container.innerHTML += cardHtml;
     });
 }
+
 
 const prevBtn = document.getElementById('prevPage');
 const nextBtn = document.getElementById('nextPage');
@@ -127,7 +147,7 @@ async function findLogAndReturn(itemId) {
             const resList = await fetch('http://localhost:5000/borrowing-active');
             if (!resList.ok) throw new Error("ไม่สามารถเชื่อมต่อ API ได้");
             const activeBorrows = await resList.json();
-            
+
             const borrowEntry = activeBorrows.find(log => log.item_id == itemId);
 
             if (!borrowEntry) {
@@ -143,9 +163,9 @@ async function findLogAndReturn(itemId) {
             const resReturn = await fetch('http://localhost:5000/return', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    log_id: borrowEntry.log_id, 
-                    item_id: itemId 
+                body: JSON.stringify({
+                    log_id: borrowEntry.log_id,
+                    item_id: itemId
                 })
             });
 
@@ -204,7 +224,7 @@ async function fetchItems(page = 1) {
 
 function openBorrowModal(itemId) {
     selectedItemId = itemId; // เก็บ ID อุปกรณ์ที่เลือก
-    
+
     // ล้างข้อมูลเก่า
     const fields = ['first_name', 'last_name', 'employees_code', 'phone_number', 'affiliation'];
     fields.forEach(id => {
@@ -259,7 +279,7 @@ async function submitBorrow() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        
+
         const result = await res.json();
 
         if (res.ok) {

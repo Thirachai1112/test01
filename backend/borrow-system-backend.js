@@ -40,10 +40,10 @@ app.get('/items', (req, res) => {
     const offset = (page - 1) * limit;
 
     // 1. กำหนดเงื่อนไขค้นหา
-    const searchCondition = `WHERE item_name LIKE ? OR contract_number LIKE ?`;
+    const searchCondition = `WHERE items.item_name LIKE ? OR items.contract_number LIKE ?`;
     const searchParams = [`%${search}%`, `%${search}%`];
 
-    // 2. Query แรก: นับจำนวนทั้งหมด (เพื่อให้คำนวณ totalPages ได้)
+    // 2. นับจำนวนทั้งหมด (เพื่อให้คำนวณ totalPages ได้)
     const countSql = `SELECT COUNT(*) as total FROM items ${searchCondition}`;
 
     db.query(countSql, searchParams, (err, countResult) => {
@@ -52,13 +52,21 @@ app.get('/items', (req, res) => {
         const totalItems = countResult[0].total;
         const totalPages = Math.ceil(totalItems / limit);
 
-        // 3. Query ที่สอง: ดึงข้อมูลรายการอุปกรณ์ตามคำค้นหาและหน้าที่เลือก
-        const sql = `SELECT * FROM items ${searchCondition} LIMIT ? OFFSET ?`;
+        // 3. ดึงข้อมูล (ต้องมี ${searchCondition} แทรกก่อน ORDER BY)
+      const sql = `
+    SELECT items.*, categories.item_type AS category_display_name
+    FROM items 
+    LEFT JOIN categories ON items.cat_id = categories.cat_id 
+    ${searchCondition}
+    ORDER BY items.item_id DESC 
+    LIMIT ? OFFSET ?`;
 
         db.query(sql, [...searchParams, limit, offset], (err, results) => {
-            if (err) return res.status(500).json(err);
+            if (err) {
+                console.error("Select Error:", err);
+                return res.status(500).json(err);
+            }
 
-            // 4. ส่งค่ากลับไปที่ Frontend (รูปแบบ JSON)
             res.json({
                 items: results,
                 pagination: {
@@ -173,11 +181,11 @@ app.post('/borrow', (req, res) => {
             // ป้องกัน Error 500 โดยการใส่ค่าว่าง ('') แทนค่าที่อาจไม่ได้ส่งมา
             const sqlAddEmp = "INSERT INTO employees (first_name, last_name, employees_code, phone_number, Affiliation, role_id) VALUES (?, ?, ?, ?, ?, 2)";
             const empValues = [
-                first_name || '', 
-                last_name || '', 
-                employees_code, 
-                phone_number || '', 
-                affiliation || '', 
+                first_name || '',
+                last_name || '',
+                employees_code,
+                phone_number || '',
+                affiliation || '',
             ];
 
             db.query(sqlAddEmp, empValues, (addErr, addResult) => {
@@ -271,7 +279,7 @@ app.get('/borrowing-active', (req, res) => {
         FROM borrowing_logs l
         JOIN employees e ON l.employee_id = e.id
         WHERE l.return_date IS NULL`;
-    
+
     db.query(sql, (err, results) => {
         if (err) {
             console.error(err);
@@ -385,22 +393,48 @@ app.get('/employees/:id', (req, res) => {
 
 // 8.API สำหรับเพิ่มอุปกรณ์ใหม่พร้อมรูปภาพ
 app.post('/add-item', upload.single('image'), (req, res) => {
-    // 1. รับค่า contract_number เพิ่มมาจาก req.body
+    // 1. รับค่าจาก req.body
+    if (!req.body) {
+        return res.status(400).json({ error: "ไม่ได้รับข้อมูลจาก Form" });
+    }
     const { item_name, cat_id, asset_number, serial_number, contract_number, status } = req.body;
+    if (!item_name) {
+        return res.status(400).json({ error: "กรุณาระบุชื่ออุปกรณ์" });
+    }
+    // 2. จัดการเรื่องรูปภาพ
     const image_url = req.file ? req.file.filename : null;
 
-    // 2. เพิ่ม contract_number ลงในคำสั่ง SQL
+    // 3. จัดการ cat_id: ถ้าเป็นค่าว่างหรือ undefined ให้เป็น null (แก้ปัญหา Incorrect integer value)
+    const final_cat_id = (cat_id && cat_id !== '') ? cat_id : 4;
+
+    // 4. เตรียมคำสั่ง SQL
     const sql = `INSERT INTO items 
                  (item_name, cat_id, asset_number, serial_number, contract_number, image_url, status) 
                  VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
-    // 3. ใส่ค่า contract_number ลงใน Array ของ Parameter
-    db.query(sql, [item_name, cat_id, asset_number, serial_number, contract_number, image_url, status || 'Available'], (err, result) => {
+    // 5. ส่งคำสั่งไปที่ Database
+    const values = [
+        item_name,
+        final_cat_id,
+        asset_number,
+        serial_number,
+        contract_number,
+        image_url,
+        status || 'Available'
+    ];
+
+    db.query(sql, values, (err, result) => {
         if (err) {
-            console.error(err);
-            return res.status(500).json({ error: "Database error" });
+            console.error("❌ Database Error:", err.message); // แสดง Error ที่เข้าใจง่ายใน Terminal
+            return res.status(500).json({ error: "ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้", details: err.message });
         }
-        res.json({ message: "เพิ่มอุปกรณ์เรียบร้อยแล้ว", id: result.insertId });
+
+        console.log("✅ เพิ่มข้อมูลสำเร็จ ID:", result.insertId);
+        res.json({
+            message: "เพิ่มอุปกรณ์เรียบร้อยแล้ว",
+            id: result.insertId,
+            image: image_url
+        });
     });
 });
 
@@ -414,7 +448,6 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
         cat_id,
         asset_number,
         serial_number,
-        item_type,
         contract_number,
         status
     } = req.body;
@@ -461,7 +494,6 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
             updated_cat_id,
             updated_asset_number,
             updated_serial_number,
-            updated_item_type,
             updated_contract_number,
             updated_status,
             updated_image,
@@ -481,7 +513,6 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
                 message: "อัปเดตข้อมูลอุปกรณ์เรียบร้อยแล้ว!",
                 updated_data: {
                     item_name: updated_item_name,
-                    type: updated_item_type,
                     cat_id: updated_cat_id,
                     asset_number: updated_asset_number,
                     serial_number: updated_serial_number,

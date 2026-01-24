@@ -1,20 +1,53 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <title>Admin Dashboard | ระบบยืม-คืน</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background-color: #f4f7f6; font-family: 'Kanit', sans-serif; }
-        .sidebar { width: 250px; height: 100vh; background: #2c3e50; color: white; position: fixed; }
-        .main-content { margin-left: 250px; padding: 20px; }
-        .nav-link { color: white; opacity: 0.8; }
-        .nav-link:hover, .nav-link.active { opacity: 1; background: #34495e; }
-        .card-stat { border: none; border-radius: 15px; transition: 0.3s; }
-        .card-stat:hover { transform: translateY(-5px); }
+        body {
+            background-color: #f4f7f6;
+            font-family: 'Kanit', sans-serif;
+        }
+
+        .sidebar {
+            width: 250px;
+            height: 100vh;
+            background: #2c3e50;
+            color: white;
+            position: fixed;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+
+        .nav-link {
+            color: white;
+            opacity: 0.8;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            opacity: 1;
+            background: #34495e;
+        }
+
+        .card-stat {
+            border: none;
+            border-radius: 15px;
+            transition: 0.3s;
+        }
+
+        .card-stat:hover {
+            transform: translateY(-5px);
+        }
     </style>
 </head>
+
 <body>
 
     <div class="sidebar d-flex flex-column p-3">
@@ -22,12 +55,12 @@
         <hr>
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
-                <a href="#" class="nav-link active" onclick="showSection('dashboard')">
+                <a href="#" class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')">
                     <i class="fas fa-chart-line me-2"></i> แผงควบคุม
                 </a>
             </li>
             <li>
-                <a href="#" class="nav-link" onclick="showSection('inventory')">
+                <a href="#" class="nav-link" id="nav-inventory" onclick="showSection('inventory')">
                     <i class="fas fa-boxes me-2"></i> จัดการอุปกรณ์
                 </a>
             </li>
@@ -38,30 +71,30 @@
             </li>
         </ul>
         <div class="mt-auto p-3">
-    <hr class="text-white-50">
-    <a href="/Default.html" class="btn btn-outline-light w-100 border-0 text-start py-3 shadow-none">
-        <i class="fas fa-arrow-left me-2"></i> ย้อนกลับหน้าหลัก
-    </a>
-</div>
+            <hr class="text-white-50">
+            <a href="/Default.html" class="btn btn-outline-light w-100 border-0 text-start py-3">
+                <i class="fas fa-arrow-left me-2"></i> ย้อนกลับหน้าหลัก
+            </a>
+        </div>
     </div>
 
     <div class="main-content">
         <div id="dashboard-section">
             <h2 class="mb-4">สรุปภาพรวม</h2>
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-4 mb-3">
                     <div class="card card-stat bg-primary text-white p-4">
                         <h5>อุปกรณ์ทั้งหมด</h5>
                         <h2 id="total-items">0</h2>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 mb-3">
                     <div class="card card-stat bg-warning text-dark p-4">
                         <h5>กำลังยืมอยู่</h5>
                         <h2 id="total-borrowed">0</h2>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 mb-3">
                     <div class="card card-stat bg-success text-white p-4">
                         <h5>ว่างพร้อมใช้งาน</h5>
                         <h2 id="total-available">0</h2>
@@ -77,28 +110,108 @@
                     <i class="fas fa-plus"></i> เพิ่มอุปกรณ์ใหม่
                 </button>
             </div>
-            <table class="table table-white table-striped shadow-sm rounded">
-                <thead>
-                    <tr>
-                        <th>รูป</th>
-                        <th>ชื่ออุปกรณ์</th>
-                        <th>Serial Number</th>
-                        <th>สถานะ</th>
-                        <th>จัดการ</th>
-                    </tr>
-                </thead>
-                <tbody id="inventory-list">
-                    </tbody>
-            </table>
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="100">รูปภาพ</th>
+                                <th>ชื่ออุปกรณ์</th>
+                                <th>Serial Number</th>
+                                <th>ประเภท</th>
+                                <th>สถานะ</th>
+                                <th class="text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-list">
+                        </tbody>
+                    </table>
+                    <nav>
+                        <ul id="pagination-container" class="pagination justify-content-center"></ul>
+                    </nav>
+                </div>
+            </div>
         </div>
     </div>
 
+    <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">เพิ่มอุปกรณ์ใหม่</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="itemForm">
+                        <input type="hidden" id="edit_item_id">
+                        <div class="mb-3 text-center">
+                            <img id="preview" src="https://via.placeholder.com/150" class="rounded mb-2 border"
+                                style="width: 150px; height: 150px; object-fit: contain;">
+                            <input type="file" class="form-control" id="imageInput" accept="image/*"
+                                onchange="previewImage(event)">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ชื่ออุปกรณ์</label>
+                            <input type="text" class="form-control" id="item_name" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ประเภทอุปกรณ์</label>
+                                <select name="cat_id" id="cat_id" class="form-select">
+                                    <option value="1">Laptop / Computer</option>
+                                    <option value="2">เครื่องเย็บกระดาษ / อุปกรณ์สำนักงาน</option>
+                                    <option value="3">Switch / Network</option>
+                                    <option value="4">อื่นๆ</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">สถานะ</label>
+                                <select class="form-select" id="status">
+                                    <option value="Available">Available</option>
+                                    <option value="Borrowed">Borrowed</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label>Asset Number</label>
+                            <input type="text" class="form-control" id="asset_number">
+                        </div>
+                        <div class="mb-2">
+                            <label>Serial Number</label>
+                            <input type="text" class="form-control" id="serial_number">
+                        </div>
+                        <div class="mb-2">
+                            <label>Contract Number</label>
+                            <input type="text" class="form-control" id="contract_number">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="button" class="btn btn-primary" onclick="saveItem()">บันทึกข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="admin-script.js"></script>
     <script>
         function showSection(section) {
             document.getElementById('dashboard-section').style.display = section === 'dashboard' ? 'block' : 'none';
             document.getElementById('inventory-section').style.display = section === 'inventory' ? 'block' : 'none';
-            // เพิ่มเงื่อนไขสำหรับ logs ต่อไป
+
+            // อัปเดตสถานะปุ่มใน Sidebar
+            document.getElementById('nav-dashboard').classList.toggle('active', section === 'dashboard');
+            document.getElementById('nav-inventory').classList.toggle('active', section === 'inventory');
+
+            if (section === 'inventory') {
+                loadInventory(1); // โหลดข้อมูลทันทีเมื่อกดหน้าจัดการอุปกรณ์
+            }
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
+
 </html>
