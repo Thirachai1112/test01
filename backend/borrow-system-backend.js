@@ -442,7 +442,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
 app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
     const { item_id } = req.params;
 
-    // รับค่าต่างๆ จาก Body (Postman แถบ form-data)
+    // 1. รับค่าจาก Body
     const {
         item_name,
         cat_id,
@@ -452,37 +452,34 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
         status
     } = req.body;
 
-    // เช็คว่ามีการอัปโหลดรูปใหม่มาไหม
     const newImage = req.file ? req.file.filename : null;
 
-    // 1. ดึงข้อมูลเดิมจาก DB มาดูก่อน (เพื่อใช้ในกรณีที่บางค่าไม่ได้ส่งมา)
+    // 2. ตรวจสอบข้อมูลเดิม
     db.query("SELECT * FROM items WHERE item_id = ?", [item_id], (err, results) => {
         if (err) return res.status(500).json(err);
         if (results.length === 0) {
-            if (req.file) fs.unlinkSync(req.file.path); // ลบไฟล์ที่เพิ่งอัปโหลดถ้าไม่เจอ ID
+            if (req.file) fs.unlinkSync(req.file.path);
             return res.status(404).json({ error: "ไม่พบอุปกรณ์ ID นี้" });
         }
 
         const currentData = results[0];
 
-        // 2. ตั้งค่าข้อมูลที่จะบันทึก (ถ้าไม่มีค่าใหม่ส่งมา ให้ใช้ค่าเดิมจาก DB)
+        // 3. ตั้งค่าข้อมูลที่จะบันทึก (แก้ไขจุดที่เคยผิด: ลบ item_type ออก)
         const updated_item_name = item_name || currentData.item_name;
         const updated_cat_id = cat_id || currentData.cat_id;
         const updated_asset_number = asset_number || currentData.asset_number;
         const updated_serial_number = serial_number || currentData.serial_number;
         const updated_contract_number = contract_number || currentData.contract_number;
-        const updated_item_type = item_type || currentData.item_type;
         const updated_status = status || currentData.status;
         const updated_image = newImage || currentData.image_url;
 
-        // 3. คำสั่ง SQL สำหรับ Update ทุกฟิลด์
+        // 4. SQL Update (ลบคอลัมน์ item_type ออกเพื่อให้ตรงกับ DB)
         const sql = `
             UPDATE items 
             SET item_name = ?, 
                 cat_id = ?, 
                 asset_number = ?, 
                 serial_number = ?,
-                item_type = ?,
                 contract_number = ?, 
                 status = ?, 
                 image_url = ? 
@@ -503,10 +500,12 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
         db.query(sql, values, (err, result) => {
             if (err) return res.status(500).json(err);
 
-            // 4. ถ้ามีการเปลี่ยนรูปใหม่ และรูปเก่าไม่ใช่รูปพื้นฐาน ให้ลบรูปเก่าทิ้ง
+            // 5. จัดการรูปภาพเก่า
             if (newImage && currentData.image_url && currentData.image_url !== 'default_device.png') {
                 const oldPath = path.join(__dirname, 'uploads', currentData.image_url);
-                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
             }
 
             res.json({
@@ -514,9 +513,6 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
                 updated_data: {
                     item_name: updated_item_name,
                     cat_id: updated_cat_id,
-                    asset_number: updated_asset_number,
-                    serial_number: updated_serial_number,
-                    contract_number: updated_contract_number,
                     status: updated_status,
                     image_url: updated_image
                 }

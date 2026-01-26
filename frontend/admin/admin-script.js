@@ -1,4 +1,4 @@
-
+let currentInventory = [];
 let currentPage = 1;
 
 
@@ -21,20 +21,30 @@ async function loadInventory(page = 1, search = '') {
         const response = await fetch(`http://localhost:5000/items?page=${page}&limit=6&search=${encodeURIComponent(search)}`);
         const data = await response.json();
 
+        // ✅ เก็บข้อมูลลงในตัวแปร global เพื่อใช้ในการแก้ไขโดยไม่ต้องดึง API รายชิ้นที่พังอยู่
+        currentInventory = data.items;
+
+        if (data.pagination) {
+            // ถ้าระบบส่งค่าสรุปมากับ pagination ให้ใช้ค่านั้น
+            document.getElementById('total-items').innerText = data.pagination.totalItems || 0;
+
+            // หรือถ้านับจากรายการที่มีอยู่ในหน้าปัจจุบัน (แบบชั่วคราว)
+            const availableCount = currentInventory.filter(i => i.status === 'Available').length;
+            const borrowedCount = currentInventory.filter(i => i.status === 'Borrowed').length;
+
+            document.getElementById('total-available').innerText = availableCount;
+            document.getElementById('total-borrowed').innerText = borrowedCount;
+        }
+
         const listElement = document.getElementById('inventory-list');
         listElement.innerHTML = '';
 
         if (data.items && data.items.length > 0) {
             data.items.forEach(item => {
-                // แปลงค่าประเภทอุปกรณ์จาก ID
-                const categoryDisplay = item.category_display_name || 'ไม่ระบุ';
-                
-                
                 const fullImageUrl = item.image_url
                     ? `http://localhost:5000/uploads/${item.image_url}`
                     : 'https://via.placeholder.com/50';
 
-                // จัดลำดับคอลัมน์ให้ตรงกับ <thead> ใน HTML
                 listElement.innerHTML += `
                     <tr>
                         <td class="text-center">
@@ -42,15 +52,12 @@ async function loadInventory(page = 1, search = '') {
                         </td>
                         <td><strong>${item.item_name}</strong></td>
                         <td><code>${item.serial_number || item.asset_number || '-'}</code></td>
-                        
-                        <td><span class="text-muted">${categoryDisplay}</span></td>
-                        
+                        <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
                         <td>
                             <span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-warning text-dark'}">
                                 ${item.status || 'N/A'}
                             </span>
                         </td>
-
                         <td class="text-center">
                             <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
                                 <i class="fas fa-edit"></i>
@@ -61,22 +68,34 @@ async function loadInventory(page = 1, search = '') {
                         </td>
                     </tr>`;
             });
-
             if (data.pagination) renderPagination(data.pagination);
-
-        } else {
-            listElement.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-muted">ไม่พบข้อมูลอุปกรณ์</td></tr>';
         }
-
-        // อัปเดต Dashboard
-        if (data.pagination && document.getElementById('total-items')) {
-            document.getElementById('total-items').innerText = data.pagination.totalItems;
-        }
-
     } catch (error) {
         console.error('Error loading inventory:', error);
     }
 }
+
+// async function updateDashboardNumbers() {
+//     try {
+//         // ดึงข้อมูลทั้งหมดแบบไม่แบ่งหน้าเพื่อมานับสรุป
+//         const response = await fetch(`http://localhost:5000/items?limit=999`); 
+//         const data = await response.json();
+//         const items = data.items;
+
+//         const total = items.length;
+//         const borrowed = items.filter(i => i.status === 'Borrowed').length;
+//         const available = items.filter(i => i.status === 'Available').length;
+
+//         // ใส่ค่าลงใน HTML ID ที่คุณมีอยู่
+//         document.getElementById('total-items').innerText = total;
+//         document.getElementById('total-borrowed').innerText = borrowed;
+//         document.getElementById('total-available').innerText = available;
+//     } catch (err) {
+//         console.error("Dashboard Error:", err);
+//     }
+// }
+
+// เรียกใช้ฟังก์ชันนี้ใน showSection('dashboard')
 
 async function deleteItem(itemId) {
     // ใช้ SweetAlert2 สร้างกล่องยืนยันที่สวยงาม
@@ -118,20 +137,20 @@ async function deleteItem(itemId) {
                     showConfirmButton: false
                 });
                 // location.reload(); 
-               
+
             } else {
-                
+
                 // แจ้งเตือนกรณีลบไม่ได้ (เช่น ติดยืมอยู่)
                 Swal.fire({
                     icon: 'error',
                     title: 'ลบไม่สำเร็จ',
                     text: resData.error || 'เกิดข้อผิดพลาดบางอย่าง'
                 });
-                
+
             }
-              if (typeof loadInventory === 'function') {
-                    loadInventory(); 
-                }
+            if (typeof loadInventory === 'function') {
+                loadInventory();
+            }
         } catch (error) {
             console.error("Delete error:", error);
             Swal.fire({
@@ -210,33 +229,33 @@ async function saveItem() {
     }
 }
 
-async function editItem(id) {
-    try {
-        const response = await fetch(`http://localhost:5000/item/${id}`); // แก้ URL ให้ตรงกับ API ของคุณ
-        const item = await response.json();
+function editItem(id) {
+    const item = currentInventory.find(i => i.item_id == id);
 
-        // ใส่ข้อมูลลงในฟอร์ม
+    if (item) {
+        // นำข้อมูลไปใส่ใน Input ของ Modal แก้ไข (เช็ค ID ให้ตรงกับ HTML)
         document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('item_name').value = item.item_name;
-        document.getElementById('cat_id').value = item.cat_id || "";
-        document.getElementById('asset_number').value = item.asset_number;
-        document.getElementById('serial_number').value = item.serial_number;
-        document.getElementById('contract_number').value = item.contract_number;
-        document.getElementById('status').value = item.status;
+        document.getElementById('edit_item_name').value = item.item_name;
+        document.getElementById('edit_cat_id').value = item.cat_id || "";
+        document.getElementById('edit_asset_number').value = item.asset_number || "";
+        document.getElementById('edit_serial_number').value = item.serial_number || "";
+        document.getElementById('edit_contract_number').value = item.contract_number || "";
+        document.getElementById('edit_status').value = item.status;
 
-        // 🖼️ แสดงรูปภาพปัจจุบันใน Modal
-        const previewImg = document.getElementById('preview');
-        if (item.image_url) {
-            previewImg.src = `http://localhost:5000/uploads/${item.image_url}`;
-        } else {
-            previewImg.src = "https://via.placeholder.com/150";
+        // แสดงรูปภาพตัวอย่าง
+        const previewImg = document.getElementById('edit_preview');
+        if (previewImg) {
+            previewImg.src = item.image_url
+                ? `http://localhost:5000/uploads/${item.image_url}`
+                : "https://via.placeholder.com/150";
         }
 
-        // เปลี่ยนหัวข้อ Modal และสั่งเปิด
-        document.getElementById('modalTitle').innerText = "แก้ไขข้อมูลอุปกรณ์";
-        new bootstrap.Modal(document.getElementById('itemModal')).show();
-    } catch (error) {
-        console.error("Error loading item for edit:", error);
+        // เปิด Modal
+        const editModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+        editModal.show();
+    } else {
+        console.error("ReferenceError: item is not defined - ID:", id); // แก้ปัญหาที่เคยเจอ
+        Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลในรายการปัจจุบัน', 'error');
     }
 }
 
@@ -250,6 +269,89 @@ function previewImage(event) {
     if (event.target.files[0]) {
         reader.readAsDataURL(event.target.files[0]);
     }
+}
+
+// 1. ฟังก์ชันเปิด Modal และดึงข้อมูลเดิมมาแสดง
+function openEditModal(itemId) {
+    // ค้นหาข้อมูลจากตัวแปร currentInventory ที่เราเก็บไว้ตอน loadInventory
+    const item = currentInventory.find(i => i.item_id == itemId);
+
+    if (item) {
+        // ยัดข้อมูลลง Input (เช็ค ID ให้ตรงกับใน HTML นะครับ)
+        document.getElementById('edit_item_id').value = item.item_id;
+        document.getElementById('edit_item_name').value = item.item_name;
+        document.getElementById('edit_cat_id').value = item.cat_id;
+        document.getElementById('edit_status').value = item.status;
+        document.getElementById('edit_asset_number').value = item.asset_number || '';
+        document.getElementById('edit_serial_number').value = item.serial_number || '';
+        document.getElementById('edit_contract_number').value = item.contract_number || '';
+
+        // เปิด Modal
+        const previewImg = document.getElementById('edit_preview');
+        if (previewImg) {
+            previewImg.src = item.image_url
+                ? `http://localhost:5000/uploads/${item.image_url}`
+                : "https://via.placeholder.com/150";
+        }
+
+        // 4. สั่งเปิด Modal
+        const editModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+        editModal.show();
+    } else {
+        console.error("ไม่พบข้อมูลอุปกรณ์ ID:", itemId);
+        Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลอุปกรณ์ในระบบ', 'error');
+    }
+}
+
+// 2. ฟังก์ชันส่งข้อมูลที่แก้ไขแล้วไปบันทึกที่ Server (PUT)
+async function updateItem() {
+    const itemId = document.getElementById('edit_item_id').value;
+    const formData = new FormData();
+
+    formData.append('item_name', document.getElementById('edit_item_name').value);
+    formData.append('cat_id', document.getElementById('edit_cat_id').value);
+    formData.append('asset_number', document.getElementById('edit_asset_number').value);
+    formData.append('serial_number', document.getElementById('edit_serial_number').value);
+    formData.append('contract_number', document.getElementById('edit_contract_number').value);
+    formData.append('status', document.getElementById('edit_status').value);
+
+    const imageInput = document.getElementById('edit_imageInput');
+    if (imageInput.files[0]) {
+        formData.append('image', imageInput.files[0]);
+    }
+
+    try {
+        Swal.fire({ title: 'กำลังอัปเดต...', didOpen: () => Swal.showLoading() });
+
+        const response = await fetch(`http://localhost:5000/update-item-all/${itemId}`, {
+            method: 'PUT',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            await Swal.fire({ icon: 'success', title: 'สำเร็จ', text: result.message, timer: 1500, showConfirmButton: false });
+
+            // ปิด Modal และโหลดข้อมูลหน้าเดิมใหม่โดยไม่ต้องรีโหลดหน้าเว็บทั้งหมด
+            bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
+            loadInventory(currentPage);
+        } else {
+            Swal.fire('ล้มเหลว', result.error, 'error');
+        }
+    } catch (error) {
+        console.error("Update error:", error);
+        Swal.fire('Error', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
+    }
+}
+
+function previewImageEdit(event) {
+    const reader = new FileReader();
+    reader.onload = function () {
+        const output = document.getElementById('edit_preview');
+        output.src = reader.result;
+    }
+    reader.readAsDataURL(event.target.files[0]);
 }
 
 function renderPagination(pagination) {
