@@ -33,73 +33,70 @@ const db = mysql.createPool({
     connectionLimit: 10
 });
 
+// ✅ 1. แก้ไข API ดึงข้อมูลให้กรองรายการที่ถูกลบออก (อยู่ช่วงบนของไฟล์)
+// --- ส่วนที่ 1: แก้ไข API GET /items (ประมาณบรรทัดที่ 37) ---
 app.get('/items', (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 6;
     const search = req.query.search || '';
     const offset = (page - 1) * limit;
 
-    // 1. กำหนดเงื่อนไขค้นหา
-    const searchCondition = `WHERE items.item_name LIKE ? OR items.contract_number LIKE ?`;
+    // กรองสถานะที่ถูกลบออก และค้นหาตามชื่อ/เลขสัญญา
+    const searchCondition = `
+        WHERE items.status != 'Deleted' 
+        AND (items.item_name LIKE ? OR items.contract_number LIKE ?)
+    `;
     const searchParams = [`%${search}%`, `%${search}%`];
 
-    // 2. นับจำนวนทั้งหมด (เพื่อให้คำนวณ totalPages ได้)
     const countSql = `SELECT COUNT(*) as total FROM items ${searchCondition}`;
 
     db.query(countSql, searchParams, (err, countResult) => {
-        if (err) return res.status(500).json(err);
+        if (err) return res.status(500).json({ error: "Count SQL Error", details: err });
 
         const totalItems = countResult[0].total;
         const totalPages = Math.ceil(totalItems / limit);
 
-        // 3. ดึงข้อมูล (ต้องมี ${searchCondition} แทรกก่อน ORDER BY)
-      const sql = `
-    SELECT items.*, categories.item_type AS category_display_name
-    FROM items 
-    LEFT JOIN categories ON items.cat_id = categories.cat_id 
-    ${searchCondition}
-    ORDER BY items.item_id DESC 
-    LIMIT ? OFFSET ?`;
+        const sql = `
+            SELECT items.*, categories.item_type AS category_display_name
+            FROM items 
+            LEFT JOIN categories ON items.cat_id = categories.cat_id 
+            ${searchCondition}
+            ORDER BY items.item_id DESC 
+            LIMIT ? OFFSET ?`;
 
         db.query(sql, [...searchParams, limit, offset], (err, results) => {
-            if (err) {
-                console.error("Select Error:", err);
-                return res.status(500).json(err);
-            }
-
+            if (err) return res.status(500).json({ error: "Select SQL Error", details: err });
             res.json({
                 items: results,
-                pagination: {
-                    totalItems,
-                    totalPages,
-                    currentPage: page
-                }
+                pagination: { totalItems, totalPages, currentPage: page }
             });
         });
     });
 });
+// --- ส่วนที่ 2: แก้ไข API ลบอุปกรณ์ (วางทับช่วงบรรทัดที่ 180-230) ---
+app.patch('/delete-item/:id', (req, res) => {
+    const { id } = req.params;
 
-// 1.1 API ค้นหาอุปกรณ์
-app.get('/items/search', (req, res) => {
-    const searchTerm = req.query.q;
+    // เช็คสถานะก่อนว่ามีการยืมอยู่ไหม
+    db.query("SELECT status FROM items WHERE item_id = ?", [id], (err, results) => {
+        if (err) return res.status(500).json({ error: "Database Error" });
+        if (results.length === 0) return res.status(404).json({ error: "ไม่พบอุปกรณ์" });
 
-    if (!searchTerm) {
-        return res.status(400).json({ error: "โปรดระบุคำที่ต้องการค้นหา" });
-    }
+        if (results[0].status === 'Borrowed') {
+            return res.status(400).json({ error: "ไม่สามารถลบได้: อุปกรณ์นี้กำลังถูกยืมอยู่" });
+        }
 
-    const sql = `
-        SELECT * FROM items 
-        WHERE item_name LIKE ? 
-        OR serial_number LIKE ?
-        OR asset_number LIKE ?
-        OR item_type LIKE ?
-    `;
-
-    const values = [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`];
-
-    db.query(sql, values, (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
+        // ลบ borrowing logs ที่อ้างอิงถึง item นี้ก่อน
+        db.query("DELETE FROM borrowing_logs WHERE item_id = ?", [id], (logErr) => {
+            if (logErr) return res.status(500).json({ error: "Cannot delete logs", details: logErr });
+            
+            // จากนั้นลบ item
+            const sql = "DELETE FROM items WHERE item_id = ?";
+            db.query(sql, [id], (updErr) => {
+                if (updErr) return res.status(500).json({ error: "Update Failed", details: updErr });
+                res.json({ message: "ลบอุปกรณ์เรียบร้อยแล้ว", id });
+            });
+        });
     });
 });
 
@@ -158,7 +155,7 @@ app.get('/items', (req, res) => {
 // สิ่งที่ต้องทำ: เพิ่มข้อมูลลง borrowing_logs และ เปลี่ยนสถานะไอเทมเป็น 'Borrowed'
 // API สำหรับการยืมอุปกรณ์
 app.post('/borrow', (req, res) => {
-    const { first_name, last_name, employees_code, phone_number, affiliation, item_id, note } = req.body;
+    const { first_name, last_name, employees_code, phone_number, affiliation, item_id, note, purpose } = req.body;
 
     // ตรวจสอบเบื้องต้นว่ามีข้อมูลสำคัญส่งมาไหม
     if (!employees_code || !item_id) {
@@ -205,8 +202,8 @@ app.post('/borrow', (req, res) => {
                     return res.status(400).json({ error: "อุปกรณ์นี้ถูกยืมไปแล้ว" });
                 }
 
-                const sqlLog = "INSERT INTO borrowing_logs (employee_id, item_id, note, borrow_date) VALUES (?, ?, ?, NOW())";
-                db.query(sqlLog, [empId, item_id, note || 'ยืมผ่านระบบ'], (logErr) => {
+                const sqlLog = "INSERT INTO borrowing_logs (employee_id, item_id, note, purpose, borrow_date) VALUES (?, ?, ?, ?, NOW())";
+                db.query(sqlLog, [empId, item_id, note || 'ยืมผ่านระบบ', purpose || null], (logErr) => {
                     if (logErr) {
                         console.error("SQL Log Error:", logErr);
                         return res.status(500).json({ error: "บันทึกประวัติล้มเหลว" });
@@ -521,64 +518,7 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
     });
 });
 
-//10. ตรวจสอบข้อมูลก่อนลบ
-app.delete('/delete-item/:item_id', (req, res) => {
-    const { item_id } = req.params;
 
-    // 1. ตรวจสอบสถานะก่อนว่า 'Borrowed' หรือไม่
-    const checkStatusSql = "SELECT status, image_url FROM items WHERE item_id = ?";
-
-    db.query(checkStatusSql, [item_id], (err, results) => {
-        if (err) return res.status(500).json(err);
-        if (results.length === 0) return res.status(404).json({ error: "ไม่พบอุปกรณ์นี้ในระบบ" });
-
-        const item = results[0];
-
-        // 🛡️ Validation: ถ้าของถูกยืมอยู่ ห้ามลบเด็ดขาด!
-        if (item.status === 'Borrowed') {
-            return res.status(400).json({
-                error: "ไม่สามารถลบได้: อุปกรณ์นี้กำลังถูกยืมอยู่ กรุณารอให้คืนของก่อน"
-            });
-        }
-
-        // 2. ถ้าผ่าน Validation (Status เป็น Available) ให้ทำการลบ
-        const deleteSql = "DELETE FROM items WHERE item_id = ?";
-        db.query(deleteSql, [item_id], (deleteErr, deleteResult) => {
-            if (deleteErr) return res.status(500).json(deleteErr);
-
-            // 3. (Optional) ลบไฟล์รูปภาพในโฟลเดอร์ uploads ทิ้งด้วยเพื่อประหยัดพื้นที่
-            if (item.image_url && item.image_url !== 'default_device.png') {
-                const filePath = `./uploads/${item.image_url}`;
-                fs.unlink(filePath, (fsErr) => {
-                    if (fsErr) console.error("ไม่สามารถลบไฟล์รูปภาพได้:", fsErr);
-                });
-            }
-
-            res.json({ message: "ลบอุปกรณ์และไฟล์รูปภาพเรียบร้อยแล้ว", item_id });
-        });
-    });
-});
-
-//11. API สำหรับลบอุปกรณ์
-app.delete('/delete-item/:id', (req, res) => {
-    const { id } = req.params;
-
-    // คำสั่ง SQL สำหรับลบข้อมูล
-    const sql = "DELETE FROM items WHERE item_id = ?";
-
-    db.query(sql, [id], (err, result) => {
-        if (err) {
-            console.error("Error deleting item:", err);
-            return res.status(500).json({ error: "ไม่สามารถลบข้อมูลได้" });
-        }
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "ไม่พบอุปกรณ์ที่ต้องการลบ" });
-        }
-
-        res.json({ message: "ลบอุปกรณ์เรียบร้อยแล้ว!" });
-    });
-});
 
 // 1. สำหรับดูประวัติทั้งหมด (ย้ายกลับมาเป็นแบบไม่มี :id)
 app.get('/admin/logs-all', (req, res) => {
@@ -611,7 +551,59 @@ app.get('/admin/logs/single/:id', (req, res) => {
     });
 });
 
+// ดึงข้อมูลประวัติการยืม-คืน
+app.get('/borrowing-logs', (req, res) => {
+    const sql = `
+        SELECT logs.*, 
+               items.item_name, 
+               items.serial_number,
+               CONCAT(employees.first_name, ' ', employees.last_name) AS employee_name,
+               employees.Affiliation
+        FROM borrowing_logs logs
+        LEFT JOIN items ON logs.item_id = items.item_id
+        LEFT JOIN employees ON logs.employee_id = employees.id 
+        ORDER BY logs.borrow_date DESC
+    `;
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ logs: results || [] });
+    });
+});
+
+// API สำหรับ Admin Login
+app.post('/admin/login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: "ชื่อผู้ใช้และรหัสผ่านจำเป็น" });
+    }
+
+    const sql = "SELECT admin_id, username FROM admins WHERE username = ? AND password = ?";
+    db.query(sql, [username, password], (err, results) => {
+        if (err) {
+            console.error("SQL Error:", err);
+            return res.status(500).json({ error: "Database error" });
+        }
+
+        if (results.length > 0) {
+            const admin = results[0];
+            // สร้าง token ง่ายๆ (ในการใช้งานจริงควรใช้ JWT)
+            const token = Buffer.from(`${admin.admin_id}:${Date.now()}`).toString('base64');
+            
+            res.json({
+                message: "เข้าสู่ระบบสำเร็จ",
+                token: token,
+                admin_id: admin.admin_id,
+                username: admin.username
+            });
+        } else {
+            res.status(401).json({ error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
+        }
+    });
+});
+
 const PORT = 5000;
+console.log('Server is running on port 5000');
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

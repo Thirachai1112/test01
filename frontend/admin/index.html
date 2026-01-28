@@ -45,6 +45,11 @@
         .card-stat:hover {
             transform: translateY(-5px);
         }
+
+        .user-info {
+            font-size: 12px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 
@@ -55,26 +60,30 @@
         <hr>
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
-                <a href="#" class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')">
+                <a href="javascript:void(0)" class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')">
                     <i class="fas fa-chart-line me-2"></i> แผงควบคุม
                 </a>
             </li>
             <li>
-                <a href="#" class="nav-link" id="nav-inventory" onclick="showSection('inventory')">
+                <a href="javascript:void(0)" class="nav-link" id="nav-inventory" onclick="showSection('inventory')">
                     <i class="fas fa-boxes me-2"></i> จัดการอุปกรณ์
                 </a>
             </li>
             <li>
-                <a href="#" class="nav-link" onclick="showSection('logs')">
+                <a href="javascript:void(0)" class="nav-link" onclick="showSection('logs')">
                     <i class="fas fa-history me-2"></i> ประวัติการยืม-คืน
                 </a>
             </li>
         </ul>
         <div class="mt-auto p-3">
+            <div class="user-info mb-3" id="userInfo">
+                <small><i class="fas fa-user-circle me-1"></i> <span id="usernameDisplay">Admin</span></small>
+            </div>
             <hr class="text-white-50">
-            <a href="/Default.html" class="btn btn-outline-light w-100 border-0 text-start py-3">
-                <i class="fas fa-arrow-left me-2"></i> ย้อนกลับหน้าหลัก
-            </a>
+            <button class="btn btn-outline-light w-100 border-0 text-start py-3" onclick="logout()">
+                <i class="fas fa-sign-out-alt me-2"></i> ออกจากระบบ
+            </button>
+            
         </div>
     </div>
 
@@ -106,9 +115,12 @@
         <div id="inventory-section" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>รายการอุปกรณ์</h2>
-                <button class="btn btn-success" onclick="openAddModal()">
-                    <i class="fas fa-plus"></i> เพิ่มอุปกรณ์ใหม่
-                </button>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control" id="inventory-search" placeholder="ค้นหา ชื่ออุปกรณ์ หรือ Serial Number..." style="max-width: 300px;" onkeyup="searchInventory()">
+                    <button class="btn btn-success" onclick="openAddModal()">
+                        <i class="fas fa-plus"></i> เพิ่มอุปกรณ์ใหม่
+                    </button>
+                </div>
             </div>
             <div class="card shadow-sm border-0">
                 <div class="card-body">
@@ -117,6 +129,7 @@
                             <tr>
                                 <th width="100">รูปภาพ</th>
                                 <th>ชื่ออุปกรณ์</th>
+                                <th>Asset Number</th>
                                 <th>Serial Number</th>
                                 <th>ประเภท</th>
                                 <th>สถานะ</th>
@@ -128,6 +141,38 @@
                     </table>
                     <nav>
                         <ul id="pagination-container" class="pagination justify-content-center"></ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <div id="logs-section" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>ประวัติการยืม-คืน</h2>
+                <input type="text" class="form-control" id="logs-search" placeholder="ค้นหา ชื่อพนักงาน หรือ อุปกรณ์..." style="max-width: 300px;" onkeyup="searchBorrowingLogs()">
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <table class="table table-hover align-middle table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="50">ลำดับ</th>
+                                <th>ชื่อพนักงาน</th>
+                                <th>สังกัด</th>
+                                <th>อุปกรณ์</th>
+                                <th>Serial Number</th>
+                                <th>วานที่ยืม</th>
+                                <th>วันที่คืน</th>
+                                <th>วัตถุประสงการยืม</th>
+                                <th>สถานะ</th>
+                                <th>หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-list">
+                        </tbody>
+                    </table>
+                    <nav>
+                        <ul id="logs-pagination" class="pagination justify-content-center"></ul>
                     </nav>
                 </div>
             </div>
@@ -262,20 +307,48 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="admin-script.js"></script>
-    <script>
-        function showSection(section) {
-            document.getElementById('dashboard-section').style.display = section === 'dashboard' ? 'block' : 'none';
-            document.getElementById('inventory-section').style.display = section === 'inventory' ? 'block' : 'none';
+   <script>
+    // สร้างตัวแปรไว้เช็ค เพื่อไม่ให้โหลด API ซ้ำซ้อน
+    let isInitialLoad = true;
 
-            // อัปเดตสถานะปุ่มใน Sidebar
-            document.getElementById('nav-dashboard').classList.toggle('active', section === 'dashboard');
-            document.getElementById('nav-inventory').classList.toggle('active', section === 'inventory');
+    function showSection(section) {
+        localStorage.setItem('activePage', section);
 
-            if (section === 'inventory') {
-                loadInventory(1); // โหลดข้อมูลทันทีเมื่อกดหน้าจัดการอุปกรณ์
-            }
+        // แสดง/ซ่อน Section
+        document.getElementById('dashboard-section').style.display = section === 'dashboard' ? 'block' : 'none';
+        document.getElementById('inventory-section').style.display = section === 'inventory' ? 'block' : 'none';
+        document.getElementById('logs-section').style.display = section === 'logs' ? 'block' : 'none';
+        
+        // อัปเดตเมนู
+        const navDash = document.getElementById('nav-dashboard');
+        const navInv = document.getElementById('nav-inventory');
+        if(navDash) navDash.classList.toggle('active', section === 'dashboard');
+        if(navInv) navInv.classList.toggle('active', section === 'inventory');
+
+        // โหลดข้อมูลเฉพาะเมื่อจำเป็น
+        if (section === 'inventory' && !isInitialLoad) {
+            if (typeof loadInventory === 'function') loadInventory(1);
         }
-    </script>
+        if (section === 'logs' && !isInitialLoad) {
+            if (typeof loadBorrowingLogs === 'function') loadBorrowingLogs();
+        }
+    }
+
+    window.onload = function() {
+        const savedPage = localStorage.getItem('activePage') || 'dashboard';
+        
+        // แสดง Section ก่อนเพื่อให้ UI ขึ้นทันที (ความรู้สึกจะเร็วขึ้น)
+        showSection(savedPage);
+        
+        // ถ้าเป็นหน้า inventory ให้โหลดข้อมูลแค่ครั้งเดียวตรงนี้
+        if (savedPage === 'inventory' && typeof loadInventory === 'function') {
+            loadInventory(1);
+        }
+        
+        // ปลดล็อกให้การคลิกครั้งต่อไปโหลดข้อมูลปกติ
+        isInitialLoad = false; 
+    };
+</script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 

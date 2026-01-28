@@ -1,5 +1,193 @@
 let currentInventory = [];
 let currentPage = 1;
+let filteredInventory = []; // เก็บผลลัพธ์ค้นหา inventory
+
+let currentLogsPage = 1;
+const logsPerPage = 10;
+let allBorrowingLogs = []; // เก็บข้อมูลทั้งหมด
+let filteredLogs = []; // เก็บผลลัพธ์ค้นหา logs
+
+// ฟังก์ชันค้นหาอุปกรณ์
+function searchInventory() {
+    const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
+    
+    if (searchTerm === '') {
+        loadInventory(1);
+    } else {
+        // ค้นหาจาก currentInventory ที่ดึงมาแล้ว
+        const searchResponse = {
+            items: currentInventory.filter(item => 
+                item.item_name.toLowerCase().includes(searchTerm) ||
+                (item.serial_number && item.serial_number.toLowerCase().includes(searchTerm)) ||
+                (item.asset_number && item.asset_number.toLowerCase().includes(searchTerm))
+            ),
+            pagination: { totalItems: 0, totalPages: 1, currentPage: 1 }
+        };
+        
+        displayInventory(searchResponse);
+    }
+}
+
+// ฟังก์ชันแสดง inventory (ใช้สำหรับค้นหา)
+function displayInventory(data) {
+    const listElement = document.getElementById('inventory-list');
+    listElement.innerHTML = '';
+
+    if (data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+            const fullImageUrl = item.image_url
+                ? `http://localhost:5000/uploads/${item.image_url}`
+                : 'https://via.placeholder.com/50';
+
+            listElement.innerHTML += `
+                <tr>
+                    <td class="text-center">
+                        <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
+                    </td>
+                    <td><strong>${item.item_name}</strong></td>
+                    <td><code>${item.asset_number || '-'}</code></td>
+                    <td><code>${item.serial_number || '-'}</code></td>
+                    <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
+                    <td>
+                        <span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-warning text-dark'}">
+                            ${item.status || 'N/A'}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        });
+        if (data.pagination) renderPagination(data.pagination);
+    } else {
+        listElement.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
+    }
+}
+
+// ฟังก์ชันค้นหาประวัติการยืม-คืน
+function searchBorrowingLogs() {
+    const searchTerm = document.getElementById('logs-search').value.toLowerCase();
+    currentLogsPage = 1;
+    
+    if (searchTerm === '') {
+        filteredLogs = allBorrowingLogs;
+    } else {
+        filteredLogs = allBorrowingLogs.filter(log =>
+            (log.employee_name && log.employee_name.toLowerCase().includes(searchTerm)) ||
+            (log.item_name && log.item_name.toLowerCase().includes(searchTerm)) ||
+            (log.Affiliation && log.Affiliation.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    displayBorrowingLogs(filteredLogs, currentLogsPage);
+}
+
+// ฟังก์ชันดึงข้อมูลประวัติการยืม-คืน
+async function loadBorrowingLogs(page = 1) {
+    currentLogsPage = page;
+    try {
+        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const data = await response.json();
+        allBorrowingLogs = data.logs || [];
+        filteredLogs = allBorrowingLogs;
+        
+        displayBorrowingLogs(filteredLogs, page);
+    } catch (error) {
+        console.error('Error loading borrowing logs:', error);
+    }
+}
+
+// ฟังก์ชันแสดงข้อมูล borrowing logs
+function displayBorrowingLogs(logs, page) {
+    // คำนวณ pagination
+    const totalPages = Math.ceil(logs.length / logsPerPage);
+    const offset = (page - 1) * logsPerPage;
+    const pageItems = logs.slice(offset, offset + logsPerPage);
+
+    const listElement = document.getElementById('logs-list');
+    listElement.innerHTML = '';
+
+    if (pageItems.length > 0) {
+        pageItems.forEach((log, index) => {
+            const borrowDate = new Date(log.borrow_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+            const returnDate = log.return_date 
+                ? new Date(log.return_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+                : '-';
+            const status = log.return_date ? 'คืนแล้ว' : 'ยืมอยู่';
+            const statusBadge = log.return_date ? 'bg-success' : 'bg-warning text-dark';
+            const serialNumber = log.serial_number || '-';
+            const serialColor = log.serial_number ? 'badge bg-info' : '';
+            const purpose = log.purpose ? `<small>${log.purpose}</small>` : '<small class="text-muted">-</small>';
+
+            const row = `
+                <tr>
+                    <td>${offset + index + 1}</td>
+                    <td>${log.employee_name || '-'}</td>
+                    <td><small>${log.Affiliation || '-'}</small></td>
+                    <td>${log.item_name || '-'}</td>
+                    <td><span class="${serialColor}">${serialNumber}</span></td>
+                    <td>${borrowDate}</td>
+                    <td>${returnDate}</td>
+                    <td>${purpose}</td>
+                    <td><span class="badge ${statusBadge}">${status}</span></td>
+                    <td><small>${log.note || '-'}</small></td>
+                </tr>
+            `;
+            listElement.innerHTML += row;
+        });
+        renderLogsPagination(totalPages, page);
+    } else {
+        listElement.innerHTML = '<tr><td colspan="10" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
+    }
+}
+
+// ฟังก์ชัน render pagination สำหรับ logs
+function renderLogsPagination(totalPages, currentPage) {
+    const paginationElement = document.getElementById('logs-pagination');
+    if (!paginationElement) return;
+
+    let html = '';
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="javascript:void(0)" onclick="loadBorrowingLogs(${currentPage - 1})">ก่อนหน้า</a>
+             </li>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadBorrowingLogs(${i})">${i}</a>
+                 </li>`;
+    }
+
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="javascript:void(0)" onclick="loadBorrowingLogs(${currentPage + 1})">ถัดไป</a>
+             </li>`;
+
+    paginationElement.innerHTML = html;
+}
+
+// ฟังก์ชันอัปเดตสรุปข้อมูล (เรียกเมื่อเพิ่ม/ลบ)
+async function updateDashboardStats() {
+    try {
+        // ดึงข้อมูลทั้งหมด (limit 999 แค่สำหรับนับข้อมูล)
+        const response = await fetch(`http://localhost:5000/items?page=1&limit=999`);
+        const data = await response.json();
+        const allItems = data.items || [];
+
+        const totalItems = allItems.length;
+        const availableCount = allItems.filter(i => i.status === 'Available').length;
+        const borrowedCount = allItems.filter(i => i.status === 'Borrowed').length;
+
+        document.getElementById('total-items').innerText = totalItems;
+        document.getElementById('total-available').innerText = availableCount;
+        document.getElementById('total-borrowed').innerText = borrowedCount;
+    } catch (err) {
+        console.error("Dashboard Error:", err);
+    }
+}
 
 
 // // 1. ฟังก์ชันแปลง ID เป็นชื่อประเภท (วางไว้นอก loadInventory)
@@ -24,52 +212,12 @@ async function loadInventory(page = 1, search = '') {
         // ✅ เก็บข้อมูลลงในตัวแปร global เพื่อใช้ในการแก้ไขโดยไม่ต้องดึง API รายชิ้นที่พังอยู่
         currentInventory = data.items;
 
+        // อัปเดตเฉพาะ total items จาก pagination
         if (data.pagination) {
-            // ถ้าระบบส่งค่าสรุปมากับ pagination ให้ใช้ค่านั้น
             document.getElementById('total-items').innerText = data.pagination.totalItems || 0;
-
-            // หรือถ้านับจากรายการที่มีอยู่ในหน้าปัจจุบัน (แบบชั่วคราว)
-            const availableCount = currentInventory.filter(i => i.status === 'Available').length;
-            const borrowedCount = currentInventory.filter(i => i.status === 'Borrowed').length;
-
-            document.getElementById('total-available').innerText = availableCount;
-            document.getElementById('total-borrowed').innerText = borrowedCount;
         }
 
-        const listElement = document.getElementById('inventory-list');
-        listElement.innerHTML = '';
-
-        if (data.items && data.items.length > 0) {
-            data.items.forEach(item => {
-                const fullImageUrl = item.image_url
-                    ? `http://localhost:5000/uploads/${item.image_url}`
-                    : 'https://via.placeholder.com/50';
-
-                listElement.innerHTML += `
-                    <tr>
-                        <td class="text-center">
-                            <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
-                        </td>
-                        <td><strong>${item.item_name}</strong></td>
-                        <td><code>${item.serial_number || item.asset_number || '-'}</code></td>
-                        <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
-                        <td>
-                            <span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-warning text-dark'}">
-                                ${item.status || 'N/A'}
-                            </span>
-                        </td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>`;
-            });
-            if (data.pagination) renderPagination(data.pagination);
-        }
+        displayInventory(data);
     } catch (error) {
         console.error('Error loading inventory:', error);
     }
@@ -97,67 +245,43 @@ async function loadInventory(page = 1, search = '') {
 
 // เรียกใช้ฟังก์ชันนี้ใน showSection('dashboard')
 
-async function deleteItem(itemId) {
-    // ใช้ SweetAlert2 สร้างกล่องยืนยันที่สวยงาม
+async function deleteItem(id) {
     const result = await Swal.fire({
         title: 'ยืนยันการลบ?',
-        text: "คุณจะไม่สามารถกู้คืนข้อมูลอุปกรณ์ชิ้นนี้ได้!",
+        text: "รายการนี้จะถูกซ่อนออกจากระบบ (ประวัติการยืมยังคงอยู่)",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
         confirmButtonText: 'ใช่, ลบเลย!',
         cancelButtonText: 'ยกเลิก'
     });
 
-    // ถ้าผู้ใช้กด "ใช่, ลบเลย!"
     if (result.isConfirmed) {
         try {
-            // แสดง Loading ขณะกำลังลบ
+            // แสดง loading ให้ผู้ใช้รู้ว่ากำลังทำงาน
             Swal.fire({
-                title: 'กำลังดำเนินการ...',
+                title: 'กำลังลบ...',
                 allowOutsideClick: false,
-                didOpen: () => { Swal.showLoading(); }
+                didOpen: () => Swal.showLoading()
+            });
+            
+            const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
+                method: 'PATCH', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
             });
 
-            // ตรวจสอบตัวพิมพ์ใหญ่-เล็กของ itemId ให้ตรงกับชื่อที่รับมา
-            const response = await fetch(`http://localhost:5000/delete-item/${itemId}`, {
-                method: 'DELETE'
-            });
-
-            const resData = await response.json();
+            const data = await response.json();
 
             if (response.ok) {
-                // แจ้งเตือนสำเร็จสวยๆ
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'ลบสำเร็จ!',
-                    text: resData.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-                // location.reload(); 
-
+                await Swal.fire('สำเร็จ!', data.message || 'ลบรายการเรียบร้อยแล้ว', 'success');
+                loadInventory(currentPage);
+                updateDashboardStats(); // อัปเดตสรุปข้อมูล
             } else {
-
-                // แจ้งเตือนกรณีลบไม่ได้ (เช่น ติดยืมอยู่)
-                Swal.fire({
-                    icon: 'error',
-                    title: 'ลบไม่สำเร็จ',
-                    text: resData.error || 'เกิดข้อผิดพลาดบางอย่าง'
-                });
-
-            }
-            if (typeof loadInventory === 'function') {
-                loadInventory();
+                throw new Error(data.error || `ลบไม่สำเร็จ`);
             }
         } catch (error) {
-            console.error("Delete error:", error);
-            Swal.fire({
-                icon: 'error',
-                title: 'ผิดพลาด',
-                text: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้'
-            });
+            Swal.fire('Error', error.message, 'error');
         }
     }
 }
@@ -196,36 +320,102 @@ function openAddModal() {
 }
 
 // 2. ฟังก์ชันบันทึกข้อมูล (ทั้งเพิ่มและแก้ไข)
-async function saveItem() {
-    const formData = new FormData();
+async function saveItem(event) {
+    // 1. หยุดการ Refresh หน้าจอ (หัวใจสำคัญที่ทำให้ไม่เด้ง)
+    if (event) event.preventDefault();
 
-    // ตรวจสอบว่า ID เหล่านี้มีอยู่ในหน้า HTML Modal ของคุณจริงๆ
-    formData.append('item_name', document.getElementById('item_name').value);
-    formData.append('cat_id', document.getElementById('cat_id').value || '');
-    formData.append('asset_number', document.getElementById('asset_number').value);
-    formData.append('serial_number', document.getElementById('serial_number').value);
-    formData.append('it', document.getElementById('serial_number').value);
-    formData.append('contract_number', document.getElementById('contract_number').value);
-    formData.append('status', document.getElementById('status').value);
-
-    const imageFile = document.getElementById('imageInput').files[0];
-    if (imageFile) formData.append('image', imageFile);
+    // 2. แสดงสถานะกำลังโหลด (เพื่อให้ผู้ใช้รู้ว่าระบบกำลังทำงาน)
+    Swal.fire({
+        title: 'กำลังบันทึก...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
     try {
+        const formData = new FormData();
+        
+        // 3. ดึงข้อมูลจาก Input ทีละตัวตาม ID ที่เราตั้งไว้ใน index.html
+        formData.append('item_name', document.getElementById('item_name').value);
+        formData.append('cat_id', document.getElementById('cat_id').value);
+        formData.append('status', document.getElementById('status').value);
+        formData.append('asset_number', document.getElementById('asset_number').value);
+        formData.append('serial_number', document.getElementById('serial_number').value);
+        formData.append('contract_number', document.getElementById('contract_number').value);
+
+        // 4. จัดการเรื่องรูปภาพ (ถ้ามี)
+        const imageInput = document.getElementById('imageInput');
+        if (imageInput && imageInput.files[0]) {
+            formData.append('image', imageInput.files[0]);
+        }
+
+        // 5. ส่งข้อมูลไปยัง Backend API
         const response = await fetch('http://localhost:5000/add-item', {
             method: 'POST',
             body: formData
         });
 
         if (response.ok) {
-            alert("บันทึกสำเร็จ!");
-            location.reload(); // รีโหลดหน้าเพื่อดูข้อมูลใหม่ที่เพิ่มเข้ามา
+            const data = await response.json();
+            
+            await Swal.fire({
+                icon: 'success',
+                title: 'สำเร็จ!',
+                text: 'บันทึกข้อมูลอุปกรณ์เรียบร้อยแล้ว',
+                timer: 800
+            });
+
+            const modalElement = document.getElementById('itemModal');
+            const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+            modal.hide();
+
+            // เพิ่มแถวใหม่ลงในตารางโดยตรง (ไม่ต้องโหลดหน้า)
+            if (data.item) {
+                const item = data.item;
+                const fullImageUrl = item.image_url
+                    ? `http://localhost:5000/uploads/${item.image_url}`
+                    : 'https://via.placeholder.com/50';
+
+                const newRow = `
+                    <tr>
+                        <td class="text-center">
+                            <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
+                        </td>
+                        <td><strong>${item.item_name}</strong></td>
+                        <td><code>${item.serial_number || item.asset_number || '-'}</code></td>
+                        <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
+                        <td>
+                            <span class="badge bg-success">
+                                ${item.status || 'Available'}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+
+                const listElement = document.getElementById('inventory-list');
+                listElement.insertAdjacentHTML('afterbegin', newRow);
+                currentInventory.unshift(item); // เพิ่มข้อมูลลง global array
+                updateDashboardStats(); // อัปเดตสรุปข้อมูล
+            }
         } else {
-            const errData = await response.json();
-            alert("บันทึกไม่สำเร็จ: " + errData.error);
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'บันทึกไม่สำเร็จ');
         }
+
     } catch (error) {
-        console.error("Fetch error:", error);
+        Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: error.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้'
+        });
     }
 }
 
@@ -336,6 +526,7 @@ async function updateItem() {
             // ปิด Modal และโหลดข้อมูลหน้าเดิมใหม่โดยไม่ต้องรีโหลดหน้าเว็บทั้งหมด
             bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
             loadInventory(currentPage);
+            updateDashboardStats(); // อัปเดตสรุปข้อมูล
         } else {
             Swal.fire('ล้มเหลว', result.error, 'error');
         }
@@ -380,4 +571,41 @@ function renderPagination(pagination) {
     paginationElement.innerHTML = html;
 }
 
-document.addEventListener('DOMContentLoaded', loadInventory);
+// ฟังก์ชัน Logout
+function logout() {
+    Swal.fire({
+        title: 'ยืนยันการออกจากระบบ?',
+        text: 'คุณแน่ใจหรือไม่ที่จะออกจากระบบ',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ออก',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminUser');
+            window.location.href = 'login.html';
+        }
+    });
+}
+
+// ตรวจสอบ session เมื่อโหลดหน้า
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+        // ไม่มี token ให้ไปหน้า login
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // โหลดข้อมูล Admin username (ถ้าเก็บไว้)
+    const adminUser = localStorage.getItem('adminUser');
+    if (adminUser) {
+        // หากต้องการให้แสดง username ต้องดึงจาก localStorage หรือ API
+        // ตอนนี้แสดงเป็น "Admin" ก่อน
+        document.getElementById('usernameDisplay').textContent = 'Admin ' + adminUser;
+    }
+
+    await loadInventory(); // โหลดตารางรายการก่อน
+    updateDashboardStats(); // เสร็จแล้วค่อยอัปเดตสรุป
+});

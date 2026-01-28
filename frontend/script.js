@@ -242,6 +242,7 @@ async function submitBorrow() {
     const eCode = document.getElementById('employees_code')?.value;
     const phone = document.getElementById('phone_number')?.value;
     const affil = document.getElementById('affiliation')?.value;
+    const purpose = document.getElementById('purpose')?.value;
 
     // 1. ใช้ Swal แจ้งเตือนเมื่อกรอกข้อมูลไม่ครบ
     if (!fName || !eCode || !selectedItemId) {
@@ -261,7 +262,8 @@ async function submitBorrow() {
         phone_number: phone,
         affiliation: affil,
         item_id: selectedItemId,
-        note: "ยืมผ่านระบบ"
+        note: "ยืมผ่านระบบ",
+        purpose: purpose
     };
 
     try {
@@ -284,6 +286,14 @@ async function submitBorrow() {
 
         if (res.ok) {
             // 2. แจ้งเตือนเมื่อยืมสำเร็จ
+            // Reset form inputs
+            document.getElementById('first_name').value = '';
+            document.getElementById('last_name').value = '';
+            document.getElementById('employees_code').value = '';
+            document.getElementById('phone_number').value = '';
+            document.getElementById('affiliation').value = '';
+            document.getElementById('purpose').value = '';
+            
             Swal.fire({
                 icon: 'success',
                 title: 'ยืมอุปกรณ์สำเร็จ!',
