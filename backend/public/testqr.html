@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>รายละเอียดอุปกรณ์</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* 🎨 ปรับปรุงพื้นฐานให้เหมาะกับมือถือ */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 15px; 
+            line-height: 1.6; 
+            background-color: #f0f2f5; 
+            color: #333;
+        }
+
+        /* 📱 Card ปรับขนาดตามหน้าจออัตโนมัติ */
+        .card { 
+            border: none; 
+            padding: 20px; 
+            border-radius: 15px; 
+            width: 100%;
+            max-width: 500px; 
+            background: white; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            margin: 10px auto; 
+        }
+
+        .back-link { margin-bottom: 20px; }
+        .back-link a { 
+            text-decoration: none; 
+            color: #555; 
+            font-size: 14px; 
+            display: inline-flex; 
+            align-items: center; 
+        }
+
+        h2 { color: #1a73e8; margin-bottom: 15px; font-size: 1.5rem; text-align: center; }
+
+        .info-row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #eee; 
+            font-size: 14px;
+        }
+        .info-label { font-weight: bold; color: #666; }
+
+        img { 
+            width: 100%; 
+            max-height: 300px; 
+            object-fit: contain; 
+            margin: 20px 0; 
+            border-radius: 10px; 
+            background: #fafafa;
+        }
+
+        .status-badge { 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: bold;
+            color: white;
+        }
+
+        /* 🔘 ปุ่มยืมแบบเต็มหน้าจอ กดง่ายด้วยนิ้วโป้ง */
+        .btn-borrow {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 18px;
+            margin-top: 25px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-borrow:disabled { background: #ccc; box-shadow: none; }
+
+        /* ปรับแต่ง SweetAlert ให้เหมาะกับมือถือ */
+        .swal2-input, .swal2-textarea { font-size: 16px !important; } /* ป้องกัน iOS ซูมหน้าจอเมื่อคลิก */
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div id="content">
+            <p style="text-align:center;">กำลังโหลดข้อมูลอุปกรณ์...</p>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const itemId = urlParams.get('id');
+        const SERVER_IP = window.location.hostname;
+
+        if (itemId) {
+            fetch(`http://${SERVER_IP}:5000/items/${itemId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const item = data.items ? data.items[0] : data;
+                    const isAvailable = item.status === 'Available';
+
+                    document.getElementById('content').innerHTML = `
+                        <h2>${item.item_name || 'ไม่ระบุชื่อ'}</h2>
+                        
+                        <div class="info-row">
+                            <span class="info-label">สถานะ</span>
+                            <span class="status-badge" style="background:${isAvailable ? '#28a745' : '#dc3545'}">${item.status}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">เลขทรัพย์สิน</span>
+                            <span>${item.asset_number || '-'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Serial Number</span>
+                            <span>${item.serial_number || '-'}</span>
+                        </div>
+
+                        ${item.image_url 
+                            ? `<img src="http://${SERVER_IP}:5000/uploads/${item.image_url}" alt="รูปอุปกรณ์" onerror="this.src='https://via.placeholder.com/400x300?text=ไม่มีรูปภาพ'">` 
+                            : '<div style="height:100px; display:flex; align-items:center; justify-content:center; color:#ccc;">ไม่มีรูปภาพประกอบ</div>'}
+                        
+                        <button class="btn-borrow" onclick="borrowItem('${item.item_id}')" ${!isAvailable ? 'disabled' : ''}>
+                            <i class="fas fa-hand-pointer"></i> 
+                            ${isAvailable ? 'ยืมอุปกรณ์ชิ้นนี้' : 'อุปกรณ์ถูกยืมอยู่'}
+                        </button>
+                    `;
+                })
+                .catch(err => {
+                    document.getElementById('content').innerHTML = `<p class="error">ผิดพลาด: ${err.message}</p>`;
+                });
+        }
+
+        function borrowItem(id) {
+            Swal.fire({
+                title: 'ระบุข้อมูลผู้ยืม',
+                html:
+                    '<input id="swal-input1" class="swal2-input" placeholder="ชื่อ (First Name)">' +
+                    '<input id="swal-input2" class="swal2-input" placeholder="นามสกุล (Last Name)">' +
+                    '<input id="swal-input3" class="swal2-input" placeholder="รหัสพนักงาน">' +
+                    '<input id="swal-input4" class="swal2-input" placeholder="เบอร์โทรศัพท์">' +
+                    '<input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">' +
+                    '<textarea id="swal-input6" class="swal2-textarea" placeholder="วัตถุประสงค์การยืม"></textarea>',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันการยืม',
+                cancelButtonText: 'ยกเลิก',
+                preConfirm: () => {
+                    return {
+                        firstName: document.getElementById('swal-input1').value,
+                        lastName: document.getElementById('swal-input2').value,
+                        empCode: document.getElementById('swal-input3').value,
+                        phone: document.getElementById('swal-input4').value,
+                        dept: document.getElementById('swal-input5').value,
+                        purpose: document.getElementById('swal-input6').value
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(`http://${SERVER_IP}:5000/borrow`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            item_id: id,
+                            first_name: result.value.firstName,
+                            last_name: result.value.lastName,
+                            employees_code: result.value.empCode,
+                            phone_number: result.value.phone,
+                            affiliation: result.value.dept,
+                            purpose: result.value.purpose
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.message && !data.error) {
+                            Swal.fire('สำเร็จ!', data.message, 'success').then(() => location.reload());
+                        } else {
+                            Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
+                        }
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>

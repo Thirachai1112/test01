@@ -1,0 +1,63 @@
+function displayInventory(data) {
+    const listElement = document.getElementById('inventory-list');
+    listElement.innerHTML = '';
+
+    if (data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+            // ใช้ SERVER_IP แทน localhost เพื่อให้เครื่องอื่นมองเห็นรูปด้วย
+            const fullImageUrl = item.image_url 
+                ? `http://${SERVER_IP}:5000/uploads/${item.image_url}` 
+                : 'https://via.placeholder.com/50';
+            
+            // สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
+            const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+
+            listElement.innerHTML += `
+                <tr>
+                    <td class="text-center">
+                        <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
+                    </td>
+                    <td><strong>${item.item_name}</strong></td>
+                    <td><code>${item.asset_number || '-'}</code> / <code>${item.serial_number || '-'}</code></td>
+                    <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
+                    <td>
+                        <span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-warning text-dark'}">
+                            ${item.status || 'N/A'}
+                        </span>
+                    </td>
+                    
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-dark" onclick="showQR('${qrUrl}', '${item.item_name}')">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                    </td>
+
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        });
+        if (data.pagination) renderPagination(data.pagination);
+    } else {
+        // ปรับ colspan เป็น 7 ให้เต็มตารางพอดี
+        listElement.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
+    }
+}
+
+// 🚩 อย่าลืมเพิ่มฟังก์ชัน showQR ไว้ในไฟล์ admin-script.js ด้วยนะครับ
+function showQR(qrUrl, itemName) {
+    const qrImage = document.getElementById('qrDisplayImage');
+    const downloadBtn = document.getElementById('qrDownloadBtn');
+    
+    qrImage.src = qrUrl;
+    downloadBtn.href = qrUrl;
+    downloadBtn.download = `QR_${itemName}.png`;
+
+    const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    qrModal.show();
+}

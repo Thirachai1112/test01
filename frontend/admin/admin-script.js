@@ -6,6 +6,7 @@ let currentLogsPage = 1;
 const logsPerPage = 10;
 let allBorrowingLogs = []; // เก็บข้อมูลทั้งหมด
 let filteredLogs = []; // เก็บผลลัพธ์ค้นหา logs
+const SERVER_IP = "172.21.200.101";
 
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
@@ -39,6 +40,9 @@ function displayInventory(data) {
                 ? `http://localhost:5000/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
+                //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
+            const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+
             listElement.innerHTML += `
                 <tr>
                     <td class="text-center">
@@ -53,10 +57,18 @@ function displayInventory(data) {
                             ${item.status || 'N/A'}
                         </span>
                     </td>
+<td class="text-center">
+                        <button class="btn btn-sm btn-outline-dark" onclick="showQR('${qrUrl}', '${item.item_name}')">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                    </td>
+
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
                             <i class="fas fa-edit"></i>
                         </button>
+                    
+
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -67,6 +79,19 @@ function displayInventory(data) {
     } else {
         listElement.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
     }
+}
+
+
+function showQR(qrUrl, itemName) {
+    const qrImage = document.getElementById('qrDisplayImage');
+    const downloadBtn = document.getElementById('qrDownloadBtn');
+    
+    qrImage.src = qrUrl;
+    downloadBtn.href = qrUrl;
+    downloadBtn.download = `QR_${itemName}.png`;
+
+    const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    qrModal.show();
 }
 
 // ฟังก์ชันค้นหาประวัติการยืม-คืน
@@ -321,22 +346,16 @@ function openAddModal() {
 
 // 2. ฟังก์ชันบันทึกข้อมูล (ทั้งเพิ่มและแก้ไข)
 async function saveItem(event) {
-    // 1. หยุดการ Refresh หน้าจอ (หัวใจสำคัญที่ทำให้ไม่เด้ง)
     if (event) event.preventDefault();
 
-    // 2. แสดงสถานะกำลังโหลด (เพื่อให้ผู้ใช้รู้ว่าระบบกำลังทำงาน)
     Swal.fire({
         title: 'กำลังบันทึก...',
         allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
+        didOpen: () => { Swal.showLoading(); }
     });
 
     try {
         const formData = new FormData();
-        
-        // 3. ดึงข้อมูลจาก Input ทีละตัวตาม ID ที่เราตั้งไว้ใน index.html
         formData.append('item_name', document.getElementById('item_name').value);
         formData.append('cat_id', document.getElementById('cat_id').value);
         formData.append('status', document.getElementById('status').value);
@@ -344,77 +363,50 @@ async function saveItem(event) {
         formData.append('serial_number', document.getElementById('serial_number').value);
         formData.append('contract_number', document.getElementById('contract_number').value);
 
-        // 4. จัดการเรื่องรูปภาพ (ถ้ามี)
         const imageInput = document.getElementById('imageInput');
         if (imageInput && imageInput.files[0]) {
             formData.append('image', imageInput.files[0]);
         }
 
-        // 5. ส่งข้อมูลไปยัง Backend API
-        const response = await fetch('http://localhost:5000/add-item', {
+        const response = await fetch(`http://${SERVER_IP}:5000/add-item`, {
             method: 'POST',
             body: formData
         });
 
+        const data = await response.json();
+
         if (response.ok) {
-            const data = await response.json();
-            
+            // 🚩 แสดงผลสำเร็จพร้อมรูป QR Code ทันที
             await Swal.fire({
                 icon: 'success',
-                title: 'สำเร็จ!',
-                text: 'บันทึกข้อมูลอุปกรณ์เรียบร้อยแล้ว',
-                timer: 800
+                title: 'บันทึกสำเร็จ!',
+                html: `
+                    <div class="text-center">
+                        <p>สร้าง QR Code สำหรับอุปกรณ์เรียบร้อยแล้ว</p>
+                        <img src="http://${SERVER_IP}:5000${data.qr_url}" 
+                             style="width:200px; height:200px; border:1px solid #ddd; padding:10px; margin:10px 0;">
+                        <br>
+                        <a href="http://${SERVER_IP}:5000${data.qr_url}" download class="btn btn-primary btn-sm">
+                            <i class="fas fa-download"></i> ดาวน์โหลดภาพ QR
+                        </a>
+                    </div>
+                `,
+                confirmButtonText: 'ตกลง'
             });
 
-            const modalElement = document.getElementById('itemModal');
-            const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-            modal.hide();
+            bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
+            loadInventory(1); // โหลดตารางใหม่
+            if (typeof updateDashboardStats === 'function') updateDashboardStats();
 
-            // เพิ่มแถวใหม่ลงในตารางโดยตรง (ไม่ต้องโหลดหน้า)
-            if (data.item) {
-                const item = data.item;
-                const fullImageUrl = item.image_url
-                    ? `http://localhost:5000/uploads/${item.image_url}`
-                    : 'https://via.placeholder.com/50';
-
-                const newRow = `
-                    <tr>
-                        <td class="text-center">
-                            <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
-                        </td>
-                        <td><strong>${item.item_name}</strong></td>
-                        <td><code>${item.serial_number || item.asset_number || '-'}</code></td>
-                        <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
-                        <td>
-                            <span class="badge bg-success">
-                                ${item.status || 'Available'}
-                            </span>
-                        </td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-outline-primary" onclick="editItem(${item.item_id})">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.item_id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>`;
-
-                const listElement = document.getElementById('inventory-list');
-                listElement.insertAdjacentHTML('afterbegin', newRow);
-                currentInventory.unshift(item); // เพิ่มข้อมูลลง global array
-                updateDashboardStats(); // อัปเดตสรุปข้อมูล
-            }
         } else {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'บันทึกไม่สำเร็จ');
+            throw new Error(data.error || 'บันทึกไม่สำเร็จ');
         }
 
     } catch (error) {
         Swal.fire({
             icon: 'error',
             title: 'เกิดข้อผิดพลาด',
-            text: error.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้'
+            text: error.message
         });
     }
 }
@@ -440,6 +432,16 @@ function editItem(id) {
                 : "https://via.placeholder.com/150";
         }
 
+        const qrPreviewImg = document.getElementById('edit_qr_preview');
+        if (qrPreviewImg) {
+            // ดึงรูปจากโฟลเดอร์ qrcodes ของ Server
+            qrPreviewImg.src = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+            
+            // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
+            qrPreviewImg.onerror = function() {
+                this.src = "https://via.placeholder.com/100?text=No+QR";
+            };
+        }
         // เปิด Modal
         const editModal = new bootstrap.Modal(document.getElementById('editItemModal'));
         editModal.show();

@@ -5,6 +5,7 @@ const path = require('path');
 const app = express();
 const fs = require('fs');
 const cors = require('cors');
+const QRCode = require('qrcode'); // ต้อง npm install qrcode ก่อน
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
 const storage = multer.diskStorage({
@@ -18,11 +19,12 @@ const upload = multer({ storage: storage });
 
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
 app.use('/uploads', express.static('uploads'));
-
+app.use('/qrcodes', express.static(path.join(__dirname, 'generated_qrcodes')));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use(express.static('public'));
+app.use(express.static(__dirname));
 // 1. เชื่อมต่อฐานข้อมูล (อ้างอิงตามโครงสร้าง 6 ตารางของคุณ)
 const db = mysql.createPool({
     host: 'localhost',
@@ -33,8 +35,7 @@ const db = mysql.createPool({
     connectionLimit: 10
 });
 
-// ✅ 1. แก้ไข API ดึงข้อมูลให้กรองรายการที่ถูกลบออก (อยู่ช่วงบนของไฟล์)
-// --- ส่วนที่ 1: แก้ไข API GET /items (ประมาณบรรทัดที่ 37) ---
+
 app.get('/items', (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 6;
@@ -390,26 +391,23 @@ app.get('/employees/:id', (req, res) => {
 
 // 8.API สำหรับเพิ่มอุปกรณ์ใหม่พร้อมรูปภาพ
 app.post('/add-item', upload.single('image'), (req, res) => {
-    // 1. รับค่าจาก req.body
     if (!req.body) {
         return res.status(400).json({ error: "ไม่ได้รับข้อมูลจาก Form" });
     }
+
     const { item_name, cat_id, asset_number, serial_number, contract_number, status } = req.body;
+    
     if (!item_name) {
         return res.status(400).json({ error: "กรุณาระบุชื่ออุปกรณ์" });
     }
-    // 2. จัดการเรื่องรูปภาพ
-    const image_url = req.file ? req.file.filename : null;
 
-    // 3. จัดการ cat_id: ถ้าเป็นค่าว่างหรือ undefined ให้เป็น null (แก้ปัญหา Incorrect integer value)
+    const image_url = req.file ? req.file.filename : null;
     const final_cat_id = (cat_id && cat_id !== '') ? cat_id : 4;
 
-    // 4. เตรียมคำสั่ง SQL
     const sql = `INSERT INTO items 
                  (item_name, cat_id, asset_number, serial_number, contract_number, image_url, status) 
                  VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
-    // 5. ส่งคำสั่งไปที่ Database
     const values = [
         item_name,
         final_cat_id,
@@ -420,18 +418,48 @@ app.post('/add-item', upload.single('image'), (req, res) => {
         status || 'Available'
     ];
 
-    db.query(sql, values, (err, result) => {
+    db.query(sql, values, async (err, result) => {
         if (err) {
-            console.error("❌ Database Error:", err.message); // แสดง Error ที่เข้าใจง่ายใน Terminal
+            console.error("❌ Database Error:", err.message);
             return res.status(500).json({ error: "ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้", details: err.message });
         }
 
-        console.log("✅ เพิ่มข้อมูลสำเร็จ ID:", result.insertId);
-        res.json({
-            message: "เพิ่มอุปกรณ์เรียบร้อยแล้ว",
-            id: result.insertId,
-            image: image_url
-        });
+        const newItemId = result.insertId;
+
+        // 🚩 ส่วนที่เพิ่มใหม่: การสร้าง QR Code (Logic จาก gen_qr.py)
+        try {
+            const SERVER_IP = "172.21.200.101"; // 🚩 เปลี่ยนเป็น IP เครื่องคอมคุณ
+            const qrData = `http://${SERVER_IP}:5000/testqr.html?id=${newItemId}`;
+            
+            // สร้างโฟลเดอร์ถ้ายังไม่มี
+            const qrFolder = path.join(__dirname, 'generated_qrcodes');
+            if (!fs.existsSync(qrFolder)) {
+                fs.mkdirSync(qrFolder);
+            }
+
+            const qrFileName = `qr_${newItemId}.png`;
+            const qrPath = path.join(qrFolder, qrFileName);
+
+            // สร้างไฟล์ QR Code
+            await QRCode.toFile(qrPath, qrData);
+
+            console.log("✅ เพิ่มข้อมูลและสร้าง QR สำเร็จ ID:", newItemId);
+            
+            // ส่งค่ากลับไปให้ Frontend
+            res.json({
+                message: "เพิ่มอุปกรณ์และสร้าง QR Code เรียบร้อยแล้ว",
+                id: newItemId,
+                image: image_url,
+                qr_url: `/qrcodes/${qrFileName}` // 🚩 ส่ง URL รูป QR กลับไปโชว์
+            });
+
+        } catch (qrErr) {
+            console.error("❌ QR Error:", qrErr);
+            res.json({
+                message: "เพิ่มอุปกรณ์สำเร็จ แต่สร้าง QR Code ล้มเหลว",
+                id: newItemId
+            });
+        }
     });
 });
 
@@ -601,6 +629,8 @@ app.post('/admin/login', (req, res) => {
         }
     });
 });
+
+
 
 const PORT = 5000;
 console.log('Server is running on port 5000');
