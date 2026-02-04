@@ -119,6 +119,10 @@
                             <span class="info-label">เลขทรัพย์สิน</span>
                             <span>${item.asset_number || '-'}</span>
                         </div>
+                         <div class="info-row">
+                            <span class="info-label">สัญญา</span>
+                            <span>${item.asset_number || '-'}</span>
+                        </div>
                         <div class="info-row">
                             <span class="info-label">Serial Number</span>
                             <span>${item.serial_number || '-'}</span>
@@ -141,49 +145,85 @@
 
         function borrowItem(id) {
             Swal.fire({
-                title: 'ระบุข้อมูลผู้ยืม',
-                html:
-                    '<input id="swal-input1" class="swal2-input" placeholder="ชื่อ (First Name)">' +
-                    '<input id="swal-input2" class="swal2-input" placeholder="นามสกุล (Last Name)">' +
-                    '<input id="swal-input3" class="swal2-input" placeholder="รหัสพนักงาน">' +
-                    '<input id="swal-input4" class="swal2-input" placeholder="เบอร์โทรศัพท์">' +
-                    '<input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">' +
-                    '<textarea id="swal-input6" class="swal2-textarea" placeholder="วัตถุประสงค์การยืม"></textarea>',
+                title: 'ระบุข้อมูลผู้ยืมและหลักฐาน',
+                html: `
+                    <div style="text-align: left;">
+                        <label class="swal2-label">ข้อมูลส่วนตัว</label>
+                        <input id="swal-input1" class="swal2-input" placeholder="ชื่อ (First Name)">
+                        <input id="swal-input2" class="swal2-input" placeholder="นามสกุล (Last Name)">
+                        <input id="swal-input3" class="swal2-input" placeholder="รหัสพนักงาน">
+                        <input id="swal-input4" class="swal2-input" placeholder="เบอร์โทรศัพท์">
+                        <input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">
+                        <textarea id="swal-input6" class="swal2-textarea" placeholder="วัตถุประสงค์การยืม"></textarea>
+                        
+                        <label class="swal2-label" style="display: block; margin-top: 15px;">แนบหลักฐาน (รูปภาพสภาพเครื่อง/เอกสาร)</label>
+                        <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf" style="display: block; width: 100%; margin-top: 5px;">
+                    </div>
+                `,
                 showCancelButton: true,
                 confirmButtonText: 'ยืนยันการยืม',
                 cancelButtonText: 'ยกเลิก',
+                focusConfirm: false,
                 preConfirm: () => {
+                    const firstName = document.getElementById('swal-input1').value;
+                    const empCode = document.getElementById('swal-input3').value;
+                    
+                    if (!firstName || !empCode) {
+                        Swal.showValidationMessage('กรุณาระบุชื่อและรหัสพนักงาน');
+                        return false;
+                    }
+
                     return {
-                        firstName: document.getElementById('swal-input1').value,
+                        firstName: firstName,
                         lastName: document.getElementById('swal-input2').value,
-                        empCode: document.getElementById('swal-input3').value,
+                        empCode: empCode,
                         phone: document.getElementById('swal-input4').value,
                         dept: document.getElementById('swal-input5').value,
-                        purpose: document.getElementById('swal-input6').value
+                        purpose: document.getElementById('swal-input6').value,
+                        files: document.getElementById('swal-input-file').files
                     }
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
+                    // ใช้ FormData เพื่อส่งไฟล์
+                    const formData = new FormData();
+                    formData.append('item_id', id);
+                    formData.append('first_name', result.value.firstName);
+                    formData.append('last_name', result.value.lastName);
+                    formData.append('employees_code', result.value.empCode);
+                    formData.append('phone_number', result.value.phone);
+                    formData.append('affiliation', result.value.dept);
+                    formData.append('purpose', result.value.purpose);
+                    
+                    // เพิ่มไฟล์เข้าไปใน FormData (ชื่อ 'files' ต้องตรงกับ Backend)
+                    if (result.value.files.length > 0) {
+                        for (let i = 0; i < result.value.files.length; i++) {
+                            formData.append('files', result.value.files[i]);
+                        }
+                    }
+
+                    // แสดง Loading ระหว่างส่ง
+                    Swal.fire({
+                        title: 'กำลังบันทึก...',
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
                     fetch(`http://${SERVER_IP}:5000/borrow`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            item_id: id,
-                            first_name: result.value.firstName,
-                            last_name: result.value.lastName,
-                            employees_code: result.value.empCode,
-                            phone_number: result.value.phone,
-                            affiliation: result.value.dept,
-                            purpose: result.value.purpose
-                        })
+                        body: formData // ส่งเป็น formData แทน JSON
                     })
                     .then(res => res.json())
                     .then(data => {
                         if (data.message && !data.error) {
-                            Swal.fire('สำเร็จ!', data.message, 'success').then(() => location.reload());
+                            Swal.fire('สำเร็จ!', 'บันทึกการยืมและอัปโหลดหลักฐานเรียบร้อย', 'success')
+                                .then(() => location.reload());
                         } else {
                             Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
                         }
+                    })
+                    .catch(err => {
+                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
                     });
                 }
             });

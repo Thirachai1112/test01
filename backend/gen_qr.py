@@ -14,7 +14,7 @@ db_config = {
 def generate_item_qrcode(item_id, item_name):
     # ใช้ชื่อเครื่องคอมพิวเตอร์แทน IP (เช่น DESKTOP-ABC.local)
     hostname = socket.gethostname()
-    server_address = "172.21.200.101"
+    server_address = "192.168.1.159"
     
     # ชี้ไปที่ testqr.html (พอร์ต 5000 ของ Node.js)
     # ต้องชื่อเดียวกับไฟล์ HTML ที่เรามี

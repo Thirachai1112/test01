@@ -6,7 +6,7 @@ let currentLogsPage = 1;
 const logsPerPage = 10;
 let allBorrowingLogs = []; // เก็บข้อมูลทั้งหมด
 let filteredLogs = []; // เก็บผลลัพธ์ค้นหา logs
-const SERVER_IP = "172.21.200.101";
+const SERVER_IP = "192.168.1.159";
 
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
@@ -49,8 +49,10 @@ function displayInventory(data) {
                         <img src="${fullImageUrl}" class="rounded border" width="50" height="50" style="object-fit: contain;">
                     </td>
                     <td><strong>${item.item_name}</strong></td>
+                    <td><code>${item.contract_number || '-'}</code></td>
                     <td><code>${item.asset_number || '-'}</code></td>
                     <td><code>${item.serial_number || '-'}</code></td>
+                    
                     <td><span class="text-muted">${item.category_display_name || 'ไม่ระบุ'}</span></td>
                     <td>
                         <span class="badge ${item.status === 'Available' ? 'bg-success' : 'bg-warning text-dark'}">
@@ -77,7 +79,7 @@ function displayInventory(data) {
         });
         if (data.pagination) renderPagination(data.pagination);
     } else {
-        listElement.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
+        listElement.innerHTML = '<tr><td colspan="8" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
     }
 }
 
@@ -129,7 +131,6 @@ async function loadBorrowingLogs(page = 1) {
 
 // ฟังก์ชันแสดงข้อมูล borrowing logs
 function displayBorrowingLogs(logs, page) {
-    // คำนวณ pagination
     const totalPages = Math.ceil(logs.length / logsPerPage);
     const offset = (page - 1) * logsPerPage;
     const pageItems = logs.slice(offset, offset + logsPerPage);
@@ -149,6 +150,30 @@ function displayBorrowingLogs(logs, page) {
             const serialColor = log.serial_number ? 'badge bg-info' : '';
             const purpose = log.purpose ? `<small>${log.purpose}</small>` : '<small class="text-muted">-</small>';
 
+            // --- ส่วนที่เพิ่ม: จัดการแสดงผลรูปภาพ/ไฟล์ ---
+            let filesHtml = '';
+            if (log.file_paths && log.file_paths.length > 0) {
+                log.file_paths.forEach(path => {
+                    const fileUrl = `http://localhost:5000${path}`; // ตรวจสอบ Port ให้ตรงกับ Backend
+                    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(path);
+                    
+                    if (isImage) {
+                        filesHtml += `
+                            <a href="${fileUrl}" target="_blank" title="คลิกเพื่อดูรูปใหญ่">
+                                <img src="${fileUrl}" class="img-thumbnail" 
+                                     style="width: 100px; height: 50px; object-fit: cover; cursor: pointer; margin: 2px;">
+                            </a>`;
+                    } else {
+                        filesHtml += `
+                            <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-secondary" style="margin: 5px;">
+                                <i class="bi bi-file-earmark-pdf"></i> เอกสารแนทในการยืม
+                            </a>`;
+                    }
+                });
+            } else {
+                filesHtml = '<small class="text-muted">ไม่มี</small>';
+            }
+
             const row = `
                 <tr>
                     <td>${offset + index + 1}</td>
@@ -160,14 +185,14 @@ function displayBorrowingLogs(logs, page) {
                     <td>${returnDate}</td>
                     <td>${purpose}</td>
                     <td><span class="badge ${statusBadge}">${status}</span></td>
-                    <td><small>${log.note || '-'}</small></td>
+                    <td>${filesHtml}</td>
                 </tr>
             `;
             listElement.innerHTML += row;
         });
         renderLogsPagination(totalPages, page);
     } else {
-        listElement.innerHTML = '<tr><td colspan="10" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
+        listElement.innerHTML = '<tr><td colspan="11" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
     }
 }
 
@@ -586,7 +611,7 @@ function logout() {
         if (result.isConfirmed) {
             localStorage.removeItem('adminToken');
             localStorage.removeItem('adminUser');
-            window.location.href = 'login.html';
+            window.location.href = 'http://127.0.0.1:5500/login.html';
         }
     });
 }

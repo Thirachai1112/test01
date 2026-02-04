@@ -6,15 +6,17 @@ const app = express();
 const fs = require('fs');
 const cors = require('cors');
 const QRCode = require('qrcode'); // ต้อง npm install qrcode ก่อน
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
 const storage = multer.diskStorage({
-    destination: './uploads/',
-    filename: function (req, file, cb) {
-        // ตั้งชื่อไฟล์ใหม่เป็น: id-เวลากด-นามสกุลไฟล์
-        cb(null, 'item-' + Date.now() + path.extname(file.originalname));
+    destination: 'uploads/borrowing/', // ตรวจสอบว่ามีโฟลเดอร์นี้ในโปรเจกต์
+    filename: (req, file, cb) => {
+        // เปลี่ยนชื่อไฟล์ป้องกันชื่อซ้ำ
+        cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
     }
 });
+
 const upload = multer({ storage: storage });
 
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
@@ -155,10 +157,11 @@ app.get('/items', (req, res) => {
 // // 2. API สำคัญ: บันทึกการยืมของ (Transaction)
 // สิ่งที่ต้องทำ: เพิ่มข้อมูลลง borrowing_logs และ เปลี่ยนสถานะไอเทมเป็น 'Borrowed'
 // API สำหรับการยืมอุปกรณ์
-app.post('/borrow', (req, res) => {
+// เพิ่ม upload.array('files', 5) เพื่อรับไฟล์ (สูงสุด 5 ไฟล์)
+app.post('/borrow', upload.array('files', 5), (req, res) => {
     const { first_name, last_name, employees_code, phone_number, affiliation, item_id, note, purpose } = req.body;
+    const uploadedFiles = req.files; // ไฟล์จะถูกเก็บไว้ในตัวแปรนี้
 
-    // ตรวจสอบเบื้องต้นว่ามีข้อมูลสำคัญส่งมาไหม
     if (!employees_code || !item_id) {
         return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน (รหัสพนักงาน หรือ ID อุปกรณ์)" });
     }
@@ -172,19 +175,11 @@ app.post('/borrow', (req, res) => {
         }
 
         if (empResult.length > 0) {
-            // ถ้ามีแล้ว ให้ใช้ ID เดิม
             saveBorrowing(empResult[0].id);
         } else {
             // 2. ถ้ายังไม่มี ให้บันทึกข้อมูลพนักงานใหม่
-            // ป้องกัน Error 500 โดยการใส่ค่าว่าง ('') แทนค่าที่อาจไม่ได้ส่งมา
             const sqlAddEmp = "INSERT INTO employees (first_name, last_name, employees_code, phone_number, Affiliation, role_id) VALUES (?, ?, ?, ?, ?, 2)";
-            const empValues = [
-                first_name || '',
-                last_name || '',
-                employees_code,
-                phone_number || '',
-                affiliation || '',
-            ];
+            const empValues = [first_name || '', last_name || '', employees_code, phone_number || '', affiliation || ''];
 
             db.query(sqlAddEmp, empValues, (addErr, addResult) => {
                 if (addErr) {
@@ -196,23 +191,44 @@ app.post('/borrow', (req, res) => {
         }
 
         function saveBorrowing(empId) {
-            // 3. บันทึกประวัติลง borrowing_logs และ UPDATE สถานะ items
-            // ตรวจสอบก่อนว่าไอเทมยังว่างอยู่ไหม (ป้องกันการกดย้ำ)
+            // 3. บันทึกประวัติลง borrowing_logs และจัดการไฟล์
             db.query("SELECT status FROM items WHERE item_id = ?", [item_id], (qErr, qResult) => {
                 if (qResult.length > 0 && qResult[0].status !== 'Available') {
                     return res.status(400).json({ error: "อุปกรณ์นี้ถูกยืมไปแล้ว" });
                 }
 
                 const sqlLog = "INSERT INTO borrowing_logs (employee_id, item_id, note, purpose, borrow_date) VALUES (?, ?, ?, ?, NOW())";
-                db.query(sqlLog, [empId, item_id, note || 'ยืมผ่านระบบ', purpose || null], (logErr) => {
+                db.query(sqlLog, [empId, item_id, note || 'ยืมผ่านระบบ', purpose || null], (logErr, logResult) => {
                     if (logErr) {
                         console.error("SQL Log Error:", logErr);
                         return res.status(500).json({ error: "บันทึกประวัติล้มเหลว" });
                     }
 
+                    const logId = logResult.insertId; // ดึง log_id เพื่อใช้เชื่อมกับไฟล์
+
+                    // --- ส่วนเพิ่ม: บันทึกข้อมูลไฟล์ลงตาราง borrowing_files ---
+                    if (uploadedFiles && uploadedFiles.length > 0) {
+                        const fileValues = uploadedFiles.map(file => [
+                            logId, // ใช้ log_id จาก borrowing_logs
+                            file.originalname,
+                            `/uploads/borrowing/${file.filename}`,
+                            file.mimetype
+                        ]);
+
+                        const sqlFile = "INSERT INTO borrowing_files (log_id, file_name, file_path, file_type) VALUES ?";
+                        db.query(sqlFile, [fileValues], (fileErr) => {
+                            if (fileErr) console.error("SQL File Insert Error:", fileErr);
+                        });
+                    }
+
+                    // 4. Update สถานะ items
                     db.query("UPDATE items SET status = 'Borrowed' WHERE item_id = ?", [item_id], (upErr) => {
                         if (upErr) return res.status(500).json(upErr);
-                        res.json({ message: "ยืมสำเร็จ!", employee_id: empId });
+                        res.json({ 
+                            message: "ยืมสำเร็จและอัปโหลดไฟล์เรียบร้อย!", 
+                            employee_id: empId,
+                            log_id: logId 
+                        });
                     });
                 });
             });
@@ -428,7 +444,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
 
         // 🚩 ส่วนที่เพิ่มใหม่: การสร้าง QR Code (Logic จาก gen_qr.py)
         try {
-            const SERVER_IP = "172.21.200.101"; // 🚩 เปลี่ยนเป็น IP เครื่องคอมคุณ
+            const SERVER_IP = "192.168.1.159"; // 🚩 เปลี่ยนเป็น IP เครื่องคอมคุณ
             const qrData = `http://${SERVER_IP}:5000/testqr.html?id=${newItemId}`;
             
             // สร้างโฟลเดอร์ถ้ายังไม่มี
@@ -582,19 +598,37 @@ app.get('/admin/logs/single/:id', (req, res) => {
 // ดึงข้อมูลประวัติการยืม-คืน
 app.get('/borrowing-logs', (req, res) => {
     const sql = `
-        SELECT logs.*, 
-               items.item_name, 
-               items.serial_number,
-               CONCAT(employees.first_name, ' ', employees.last_name) AS employee_name,
-               employees.Affiliation
+        SELECT 
+            logs.*, 
+            items.item_name, 
+            items.serial_number,
+            CONCAT(employees.first_name, ' ', employees.last_name) AS employee_name,
+            employees.Affiliation,
+            -- ส่วนที่เพิ่ม: รวม Path ไฟล์ทั้งหมดที่ผูกกับ log_id นี้เข้าด้วยกัน แยกด้วยเครื่องหมายคอมม่า (,)
+            GROUP_CONCAT(files.file_path) AS file_paths
         FROM borrowing_logs logs
         LEFT JOIN items ON logs.item_id = items.item_id
         LEFT JOIN employees ON logs.employee_id = employees.id 
+        -- เชื่อมกับตารางไฟล์
+        LEFT JOIN borrowing_files files ON logs.log_id = files.log_id
+        -- ต้องทำ GROUP BY เพื่อไม่ให้แถวข้อมูลซ้ำเมื่อมีหลายไฟล์
+        GROUP BY logs.log_id
         ORDER BY logs.borrow_date DESC
     `;
+
     db.query(sql, (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ logs: results || [] });
+        if (err) {
+            console.error("Fetch Logs Error:", err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        // ปรับแต่งข้อมูลเล็กน้อยเพื่อให้ฝั่ง Frontend ใช้งานง่าย (แยก string กลับเป็น Array)
+        const formattedResults = results.map(row => ({
+            ...row,
+            file_paths: row.file_paths ? row.file_paths.split(',') : []
+        }));
+
+        res.json({ logs: formattedResults || [] });
     });
 });
 
