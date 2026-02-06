@@ -136,6 +136,11 @@
                             <i class="fas fa-hand-pointer"></i> 
                             ${isAvailable ? 'ยืมอุปกรณ์ชิ้นนี้' : 'อุปกรณ์ถูกยืมอยู่'}
                         </button>
+
+                        <button class="btn-borrow" onclick="repairItem('${item.item_id}')" ${!isAvailable ? 'disabled' : ''}>
+                            <i class="fas fa-hand-pointer"></i> 
+                            ${isAvailable ? 'นำไปซ่อม' : 'ถูกนำไปซ่อมอยู่'}
+                        </button>
                     `;
                 })
                 .catch(err => {
@@ -157,7 +162,7 @@
                         <textarea id="swal-input6" class="swal2-textarea" placeholder="วัตถุประสงค์การยืม"></textarea>
                         
                         <label class="swal2-label" style="display: block; margin-top: 15px;">แนบหลักฐาน (รูปภาพสภาพเครื่อง/เอกสาร)</label>
-                        <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf" style="display: block; width: 100%; margin-top: 5px;">
+                        <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf,.docx" style="display: block; width: 100%; margin-top: 5px;">
                     </div>
                 `,
                 showCancelButton: true,
@@ -217,6 +222,68 @@
                     .then(data => {
                         if (data.message && !data.error) {
                             Swal.fire('สำเร็จ!', 'บันทึกการยืมและอัปโหลดหลักฐานเรียบร้อย', 'success')
+                                .then(() => location.reload());
+                        } else {
+                            Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
+                        }
+                    })
+                    .catch(err => {
+                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                    });
+                }
+            });
+        }
+
+
+         function repairItem(id) {
+            Swal.fire({
+                title: 'ระบุข้อมูล',
+                html: `
+                    <div style="text-align: left;">
+                        <label class="swal2-label">ยี่ห้อเครื่อง/รุ่น</label>
+                        <input id="swal-input1" class="swal2-input" placeholder="ยี่ห้อเครื่อง/รุ่น">
+                        <input id="swal-input4" class="swal2-input" placeholder="เลขที่สัญญา">
+                        <input id="swal-input2" class="swal2-input" placeholder="Serial Number">
+                        <input id="swal-input3" class="swal2-input" placeholder="เลขทรัพย์สิน">
+                        <input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">
+                        <textarea id="swal-input6" class="swal2-textarea" placeholder="อาการที่ชำรุด"></textarea>
+                        
+                        <label class="swal2-label" style="display: block; margin-top: 15px;">แนบหลักฐาน (รูปภาพสภาพเครื่อง/เอกสาร)</label>
+                        <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf,.docx" style="display: block; width: 100%; margin-top: 5px;">
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันการนำไปซ่อม',
+                cancelButtonText: 'ยกเลิก',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const firstName = document.getElementById('swal-input1').value;
+                    const empCode = document.getElementById('swal-input3').value;
+                    
+                   
+           
+                    // เพิ่มไฟล์เข้าไปใน FormData (ชื่อ 'files' ต้องตรงกับ Backend)
+                    if (result.value.files.length > 0) {
+                        for (let i = 0; i < result.value.files.length; i++) {
+                            formData.append('files', result.value.files[i]);
+                        }
+                    }
+
+                    // แสดง Loading ระหว่างส่ง
+                    Swal.fire({
+                        title: 'กำลังบันทึก...',
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
+                    fetch(`http://${SERVER_IP}:5000/borrow`, {
+                        method: 'POST',
+                        body: formData // ส่งเป็น formData แทน JSON
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.message && !data.error) {
+                            Swal.fire('สำเร็จ!', 'บันทึกการซ่อมเรียบร้อย', 'success')
                                 .then(() => location.reload());
                         } else {
                             Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');

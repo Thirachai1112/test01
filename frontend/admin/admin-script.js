@@ -11,22 +11,8 @@ const SERVER_IP = "192.168.1.159";
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
     const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
-    
-    if (searchTerm === '') {
-        loadInventory(1);
-    } else {
-        // ค้นหาจาก currentInventory ที่ดึงมาแล้ว
-        const searchResponse = {
-            items: currentInventory.filter(item => 
-                item.item_name.toLowerCase().includes(searchTerm) ||
-                (item.serial_number && item.serial_number.toLowerCase().includes(searchTerm)) ||
-                (item.asset_number && item.asset_number.toLowerCase().includes(searchTerm))
-            ),
-            pagination: { totalItems: 0, totalPages: 1, currentPage: 1 }
-        };
-        
-        displayInventory(searchResponse);
-    }
+    // ส่งคำค้นหาไปยัง Backend เพื่อค้นหาทั้งฐานข้อมูล
+    loadInventory(1, searchTerm);
 }
 
 // ฟังก์ชันแสดง inventory (ใช้สำหรับค้นหา)
@@ -347,11 +333,21 @@ function renderPagination(pagination) {
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage - 1})">ก่อนหน้า</a>
              </li>`;
 
-    for (let i = 1; i <= totalPages; i++) {
+  const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
+
+for (let i = 1; i <= totalPages; i++) {
+    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
+    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
+        
         html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
                     <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
                  </li>`;
+                 
+    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
+        // แสดง "..." เพื่อย่อเลขหน้า
+        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
     }
+}
 
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage + 1})">ถัดไป</a>
@@ -584,11 +580,21 @@ function renderPagination(pagination) {
              </li>`;
 
     // ปุ่มเลขหน้า
-    for (let i = 1; i <= totalPages; i++) {
+    const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
+
+for (let i = 1; i <= totalPages; i++) {
+    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
+    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
+        
         html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
                     <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
                  </li>`;
+                 
+    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
+        // แสดง "..." เพื่อย่อเลขหน้า
+        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
     }
+}
 
     // ปุ่ม Next
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">

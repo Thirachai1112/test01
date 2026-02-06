@@ -10,7 +10,7 @@ const { v4: uuidv4 } = require('uuid');
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
 const storage = multer.diskStorage({
-    destination: 'uploads/borrowing/', // ตรวจสอบว่ามีโฟลเดอร์นี้ในโปรเจกต์
+    destination: 'uploads', // ตรวจสอบว่ามีโฟลเดอร์นี้ในโปรเจกต์
     filename: (req, file, cb) => {
         // เปลี่ยนชื่อไฟล์ป้องกันชื่อซ้ำ
         cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
@@ -44,12 +44,12 @@ app.get('/items', (req, res) => {
     const search = req.query.search || '';
     const offset = (page - 1) * limit;
 
-    // กรองสถานะที่ถูกลบออก และค้นหาตามชื่อ/เลขสัญญา
+    // กรองสถานะที่ถูกลบออก และค้นหาตามชื่อ/เลขสัญญา/Serial Number
     const searchCondition = `
         WHERE items.status != 'Deleted' 
-        AND (items.item_name LIKE ? OR items.contract_number LIKE ?)
+        AND (items.item_name LIKE ? OR items.contract_number LIKE ? OR items.serial_number LIKE ? OR items.asset_number LIKE ?)
     `;
-    const searchParams = [`%${search}%`, `%${search}%`];
+    const searchParams = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
 
     const countSql = `SELECT COUNT(*) as total FROM items ${searchCondition}`;
 
@@ -665,6 +665,43 @@ app.post('/admin/login', (req, res) => {
 });
 
 
+app.post('/api/repair', (req, res) => {
+    const { 
+        brand, 
+        contract_number, 
+        serial_number, 
+        asset_number, 
+        affiliation, 
+        problem 
+    } = req.body;
+
+    const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem) 
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+
+    const values = [brand, contract_number, serial_number, asset_number, affiliation, problem];
+
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ success: false, message: "Database Error" });
+        }
+        res.status(201).json({ 
+            success: true, 
+            message: "บันทึกข้อมูลสำเร็จ!", 
+            id: result.insertId 
+        });
+    });
+});
+
+/**
+ * 3. GET API: ดึงข้อมูลทั้งหมดออกมาดู (เผื่อเอาไปทำตาราง Dashboard)
+ */
+app.get('/api/repair', (req, res) => {
+    db.query('SELECT * FROM repair', (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+    });
+});
 
 const PORT = 5000;
 console.log('Server is running on port 5000');
