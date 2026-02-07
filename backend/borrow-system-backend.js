@@ -9,6 +9,7 @@ const QRCode = require('qrcode'); // ต้อง npm install qrcode ก่อ�
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
+<<<<<<< HEAD
 
 
 const storage = multer.diskStorage({
@@ -29,6 +30,10 @@ const storage = multer.diskStorage({
 
         cb(null, folder);
     },
+=======
+const storage = multer.diskStorage({
+    destination: 'uploads', // ตรวจสอบว่ามีโฟลเดอร์นี้ในโปรเจกต์
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     filename: (req, file, cb) => {
         // เปลี่ยนชื่อไฟล์ป้องกันชื่อซ้ำ
         cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
@@ -110,7 +115,11 @@ app.patch('/delete-item/:id', (req, res) => {
         // ลบ borrowing logs ที่อ้างอิงถึง item นี้ก่อน
         db.query("DELETE FROM borrowing_logs WHERE item_id = ?", [id], (logErr) => {
             if (logErr) return res.status(500).json({ error: "Cannot delete logs", details: logErr });
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // จากนั้นลบ item
             const sql = "DELETE FROM items WHERE item_id = ?";
             db.query(sql, [id], (updErr) => {
@@ -242,10 +251,17 @@ app.post('/borrow', upload.array('files', 5), (req, res) => {
                     // 4. Update สถานะ items
                     db.query("UPDATE items SET status = 'Borrowed' WHERE item_id = ?", [item_id], (upErr) => {
                         if (upErr) return res.status(500).json(upErr);
+<<<<<<< HEAD
                         res.json({
                             message: "ยืมสำเร็จและอัปโหลดไฟล์เรียบร้อย!",
                             employee_id: empId,
                             log_id: logId
+=======
+                        res.json({ 
+                            message: "ยืมสำเร็จและอัปโหลดไฟล์เรียบร้อย!", 
+                            employee_id: empId,
+                            log_id: logId 
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         });
                     });
                 });
@@ -430,7 +446,11 @@ app.post('/add-item', upload.single('image'), (req, res) => {
     }
 
     const { item_name, cat_id, asset_number, serial_number, contract_number, status } = req.body;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     if (!item_name) {
         return res.status(400).json({ error: "กรุณาระบุชื่ออุปกรณ์" });
     }
@@ -464,7 +484,11 @@ app.post('/add-item', upload.single('image'), (req, res) => {
         try {
             const SERVER_IP = "192.168.1.159"; // 🚩 เปลี่ยนเป็น IP เครื่องคอมคุณ
             const qrData = `http://${SERVER_IP}:5000/testqr.html?id=${newItemId}`;
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // สร้างโฟลเดอร์ถ้ายังไม่มี
             const qrFolder = path.join(__dirname, 'generated_qrcodes');
             if (!fs.existsSync(qrFolder)) {
@@ -478,7 +502,11 @@ app.post('/add-item', upload.single('image'), (req, res) => {
             await QRCode.toFile(qrPath, qrData);
 
             console.log("✅ เพิ่มข้อมูลและสร้าง QR สำเร็จ ID:", newItemId);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // ส่งค่ากลับไปให้ Frontend
             res.json({
                 message: "เพิ่มอุปกรณ์และสร้าง QR Code เรียบร้อยแล้ว",
@@ -669,7 +697,11 @@ app.post('/admin/login', (req, res) => {
             const admin = results[0];
             // สร้าง token ง่ายๆ (ในการใช้งานจริงควรใช้ JWT)
             const token = Buffer.from(`${admin.admin_id}:${Date.now()}`).toString('base64');
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             res.json({
                 message: "เข้าสู่ระบบสำเร็จ",
                 token: token,
@@ -683,6 +715,7 @@ app.post('/admin/login', (req, res) => {
 });
 
 
+<<<<<<< HEAD
 app.post('/api/repair', upload.array('files', 5), (req, res) => {
     const {
         brand,
@@ -1017,6 +1050,43 @@ app.get('/api/repair', (req, res) => {
                 }
             });
         });
+=======
+app.post('/api/repair', (req, res) => {
+    const { 
+        brand, 
+        contract_number, 
+        serial_number, 
+        asset_number, 
+        affiliation, 
+        problem 
+    } = req.body;
+
+    const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem) 
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+
+    const values = [brand, contract_number, serial_number, asset_number, affiliation, problem];
+
+    db.query(sql, values, (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ success: false, message: "Database Error" });
+        }
+        res.status(201).json({ 
+            success: true, 
+            message: "บันทึกข้อมูลสำเร็จ!", 
+            id: result.insertId 
+        });
+    });
+});
+
+/**
+ * 3. GET API: ดึงข้อมูลทั้งหมดออกมาดู (เผื่อเอาไปทำตาราง Dashboard)
+ */
+app.get('/api/repair', (req, res) => {
+    db.query('SELECT * FROM repair', (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     });
 });
 

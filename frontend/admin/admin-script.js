@@ -6,12 +6,15 @@ let currentLogsPage = 1;
 const logsPerPage = 10;
 let allBorrowingLogs = []; // เก็บข้อมูลทั้งหมด
 let filteredLogs = []; // เก็บผลลัพธ์ค้นหา logs
+<<<<<<< HEAD
 
 // Repair Logs
 let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
 const SERVER_IP = "192.168.1.159";
 
 // ฟังก์ชันค้นหาอุปกรณ์
@@ -32,7 +35,11 @@ function displayInventory(data) {
                 ? `http://localhost:5000/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
+<<<<<<< HEAD
             //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
+=======
+                //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
 
             listElement.innerHTML += `
@@ -79,7 +86,11 @@ function displayInventory(data) {
 function showQR(qrUrl, itemName) {
     const qrImage = document.getElementById('qrDisplayImage');
     const downloadBtn = document.getElementById('qrDownloadBtn');
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     qrImage.src = qrUrl;
     downloadBtn.href = qrUrl;
     downloadBtn.download = `QR_${itemName}.png`;
@@ -92,7 +103,11 @@ function showQR(qrUrl, itemName) {
 function searchBorrowingLogs() {
     const searchTerm = document.getElementById('logs-search').value.toLowerCase();
     currentLogsPage = 1;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     if (searchTerm === '') {
         filteredLogs = allBorrowingLogs;
     } else {
@@ -102,7 +117,11 @@ function searchBorrowingLogs() {
             (log.Affiliation && log.Affiliation.toLowerCase().includes(searchTerm))
         );
     }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     displayBorrowingLogs(filteredLogs, currentLogsPage);
 }
 
@@ -114,7 +133,11 @@ async function loadBorrowingLogs(page = 1) {
         const data = await response.json();
         allBorrowingLogs = data.logs || [];
         filteredLogs = allBorrowingLogs;
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
         displayBorrowingLogs(filteredLogs, page);
     } catch (error) {
         console.error('Error loading borrowing logs:', error);
@@ -133,7 +156,11 @@ function displayBorrowingLogs(logs, page) {
     if (pageItems.length > 0) {
         pageItems.forEach((log, index) => {
             const borrowDate = new Date(log.borrow_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+<<<<<<< HEAD
             const returnDate = log.return_date
+=======
+            const returnDate = log.return_date 
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 ? new Date(log.return_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
                 : '-';
             const status = log.return_date ? 'คืนแล้ว' : 'ยืมอยู่';
@@ -148,7 +175,11 @@ function displayBorrowingLogs(logs, page) {
                 log.file_paths.forEach(path => {
                     const fileUrl = `http://localhost:5000${path}`; // ตรวจสอบ Port ให้ตรงกับ Backend
                     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(path);
+<<<<<<< HEAD
 
+=======
+                    
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     if (isImage) {
                         filesHtml += `
                             <a href="${fileUrl}" target="_blank" title="คลิกเพื่อดูรูปใหญ่">
@@ -226,7 +257,10 @@ async function updateDashboardStats() {
         document.getElementById('total-items').innerText = totalItems;
         document.getElementById('total-available').innerText = availableCount;
         document.getElementById('total-borrowed').innerText = borrowedCount;
+<<<<<<< HEAD
         document.getElementById('total-repair').innerText = totalItems - availableCount - borrowedCount;
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     } catch (err) {
         console.error("Dashboard Error:", err);
     }
@@ -257,10 +291,14 @@ async function loadInventory(page = 1, search = '') {
 
         // อัปเดตเฉพาะ total items จาก pagination
         if (data.pagination) {
+<<<<<<< HEAD
             const totalElement = document.getElementById('total-items');
             if (totalElement) { // ต้องเช็คเสมอว่ามี ID นี้ไหม
                 totalElement.innerText = data.pagination.totalItems || 0;
             }
+=======
+            document.getElementById('total-items').innerText = data.pagination.totalItems || 0;
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
         }
 
         displayInventory(data);
@@ -310,9 +348,15 @@ async function deleteItem(id) {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
+<<<<<<< HEAD
 
             const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
                 method: 'PATCH',
+=======
+            
+            const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
+                method: 'PATCH', 
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
@@ -343,6 +387,7 @@ function renderPagination(pagination) {
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage - 1})">ก่อนหน้า</a>
              </li>`;
 
+<<<<<<< HEAD
     const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
 
     for (let i = 1; i <= totalPages; i++) {
@@ -358,6 +403,23 @@ function renderPagination(pagination) {
             html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
         }
     }
+=======
+  const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
+
+for (let i = 1; i <= totalPages; i++) {
+    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
+    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
+        
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
+                 </li>`;
+                 
+    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
+        // แสดง "..." เพื่อย่อเลขหน้า
+        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    }
+}
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
 
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage + 1})">ถัดไป</a>
@@ -467,9 +529,15 @@ function editItem(id) {
         if (qrPreviewImg) {
             // ดึงรูปจากโฟลเดอร์ qrcodes ของ Server
             qrPreviewImg.src = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+<<<<<<< HEAD
 
             // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
             qrPreviewImg.onerror = function () {
+=======
+            
+            // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
+            qrPreviewImg.onerror = function() {
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 this.src = "https://via.placeholder.com/100?text=No+QR";
             };
         }
@@ -592,6 +660,7 @@ function renderPagination(pagination) {
     // ปุ่มเลขหน้า
     const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
 
+<<<<<<< HEAD
     for (let i = 1; i <= totalPages; i++) {
         // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
         if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
@@ -605,6 +674,21 @@ function renderPagination(pagination) {
             html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
         }
     }
+=======
+for (let i = 1; i <= totalPages; i++) {
+    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
+    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
+        
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
+                 </li>`;
+                 
+    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
+        // แสดง "..." เพื่อย่อเลขหน้า
+        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    }
+}
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
 
     // ปุ่ม Next
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
@@ -650,6 +734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadInventory(); // โหลดตารางรายการก่อน
+<<<<<<< HEAD
     if (document.getElementById('total-items')) {
         updateDashboardStats();
     }
@@ -759,3 +844,7 @@ function displayRepairPagination(pagination) {
 function searchRepairLogs() {
     loadRepairLogs(1);
 }
+=======
+    updateDashboardStats(); // เสร็จแล้วค่อยอัปเดตสรุป
+});
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576

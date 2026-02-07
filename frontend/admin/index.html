@@ -3,10 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
+<<<<<<< HEAD
     <title>Admin ManageMent | ระบบยืม-คืน</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous"
         onerror="this.onerror=null;this.href='/frontend/vendor/bootstrap.min.css'">
+=======
+    <title>Admin ManageMent | ระบบยืม-คืน</title>    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous" onerror="this.onerror=null;this.href='/frontend/vendor/bootstrap.min.css'">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
@@ -62,8 +66,12 @@
         <hr>
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
+<<<<<<< HEAD
                 <a href="javascript:void(0)" class="nav-link active" id="nav-dashboard"
                     onclick="showSection('dashboard')">
+=======
+                <a href="javascript:void(0)" class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     <i class="fas fa-chart-line me-2"></i> แผงควบคุม
                 </a>
             </li>
@@ -79,12 +87,21 @@
             </li>
 
             <!-- //ยังไม่สร้าง -->
+<<<<<<< HEAD
             <li>
                 <a href="javascript:void(0)" class="nav-link" id="nav-repair-logs" onclick="showSection('repair-logs')">
                     <i class="fas fa-tools me-2"></i> ประวัติการซ่อม
                 </a>
             </li>
 
+=======
+            <li>    
+                    <a href="javascript:void(0)" class="nav-link" onclick="showSection('repair-logs')">
+                        <i class="fas fa-history me-2"></i> ประวัติการซ่อม
+                    </a>
+            </li>
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
         </ul>
         <div class="mt-auto p-3">
             <div class="user-info mb-3" id="userInfo">
@@ -92,9 +109,15 @@
             </div>
             <hr class="text-white-50">
             <button class="btn btn-outline-light w-100 border-0 text-start py-3" onclick="logout()">
+<<<<<<< HEAD
                 <i class="fas fa-sign-out-alt me-2"></i> ออกจากระบบ
             </button>
 
+=======
+            <i class="fas fa-sign-out-alt me-2"></i> ออกจากระบบ
+            </button>
+            
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
         </div>
     </div>
 
@@ -103,20 +126,29 @@
             <h2 class="mb-4">สรุปภาพรวม</h2>
             <div class="row">
                 <div class="col-md-4 mb-3">
+<<<<<<< HEAD
                     <div class="card card-stat bg-primary text-white p-4"
                         onclick="window.location.href='all-devices.html';" style="cursor: pointer;">
+=======
+                    <div class="card card-stat bg-primary text-white p-4">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         <h5>อุปกรณ์ทั้งหมด</h5>
                         <h2 id="total-items">0</h2>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
+<<<<<<< HEAD
                      <div class="card card-stat bg-warning text-white p-4"
                         onclick="window.location.href='borrowed.html';" style="cursor: pointer;">
+=======
+                    <div class="card card-stat bg-warning text-dark p-4">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         <h5>กำลังยืมอยู่</h5>
                         <h2 id="total-borrowed">0</h2>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
+<<<<<<< HEAD
                     <div class="card card-stat bg-danger text-white p-4"
                         onclick="window.location.href='repair.html';" style="cursor: pointer;">
                         <h5>นำไปซ่อม</h5>
@@ -126,6 +158,9 @@
                 <div class="col-md-4 mb-3">
                     <div class="card card-stat bg-success text-white p-4"
                         onclick="window.location.href='available.html';" style="cursor: pointer;">
+=======
+                    <div class="card card-stat bg-success text-white p-4">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         <h5>ว่างพร้อมใช้งาน</h5>
                         <h2 id="total-available">0</h2>
                     </div>
@@ -137,8 +172,12 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>รายการอุปกรณ์</h2>
                 <div class="d-flex gap-2">
+<<<<<<< HEAD
                     <input type="text" class="form-control" id="inventory-search" placeholder="ค้นหา..."
                         style="max-width: 200px;" onkeyup="searchInventory()">
+=======
+                    <input type="text" class="form-control" id="inventory-search" placeholder="ค้นหา..." style="max-width: 200px;" onkeyup="searchInventory()">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     <button class="btn btn-success" onclick="openAddModal()">
                         <i class="fas fa-plus"></i> เพิ่มอุปกรณ์ใหม่
                     </button>
@@ -173,8 +212,12 @@
         <div id="logs-section" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>ประวัติการยืม-คืน</h2>
+<<<<<<< HEAD
                 <input type="text" class="form-control" id="logs-search" placeholder="ค้นหา ชื่อพนักงาน หรือ อุปกรณ์..."
                     style="max-width: 300px;" onkeyup="searchBorrowingLogs()">
+=======
+                <input type="text" class="form-control" id="logs-search" placeholder="ค้นหา ชื่อพนักงาน หรือ อุปกรณ์..." style="max-width: 300px;" onkeyup="searchBorrowingLogs()">
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
             </div>
             <div class="card shadow-sm border-0">
                 <div class="card-body">
@@ -202,6 +245,7 @@
                 </div>
             </div>
         </div>
+<<<<<<< HEAD
 
         <div id="repair-logs-section" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -249,6 +293,8 @@
                 </div>
             </div>
         </div>
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     </div>
 
     <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
@@ -316,6 +362,7 @@
         </div>
     </div>
 
+<<<<<<< HEAD
     <div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -467,6 +514,142 @@
         const CONFIG = { API_BASE: `http://${window.location.hostname}:5000` };
     </script>
     <script src="admin-script.js"></script>
+=======
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>แก้ไขข้อมูลอุปกรณ์</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editItemForm">
+                    <input type="hidden" id="edit_item_id">
+                    
+                    <div class="mb-3 text-center">
+                        <img id="edit_preview" src="https://via.placeholder.com/150" class="rounded mb-2 border"
+                            style="width: 150px; height: 150px; object-fit: contain;">
+                        <input type="file" class="form-control" id="edit_imageInput" accept="image/*"
+                            onchange="previewImageEdit(event)">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">ชื่ออุปกรณ์</label>
+                        <input type="text" class="form-control" id="edit_item_name" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">ประเภทอุปกรณ์</label>
+                            <select id="edit_cat_id" class="form-select">
+                                <option value="1">Laptop / Computer</option>
+                                <option value="2">อุปกรณ์สำนักงาน</option>
+                                <option value="3">Switch / Network</option>
+                                <option value="4">อะไหล่คอมพิวเตอร์</option>
+                                <option value="5">สื่อบันทึกข้อมูล</option>
+                                <option value="6">เครื่องมือช่าง</option>
+                                <option value="6">เครื่องพิมพ์เอกสาร</option>
+                                <option value="8">Mouse & Keyboard</option>
+
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">สถานะ</label>
+                            <select class="form-select" id="edit_status">
+                                <option value="Available">Available</option>
+                                <option value="Borrowed">Borrowed</option>
+                                <option value="Maintenance">Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Asset Number</label>
+                        <input type="text" class="form-control" id="edit_asset_number">
+                    </div>
+                    <div class="mb-2">
+                        <label>Serial Number</label>
+                        <input type="text" class="form-control" id="edit_serial_number">
+                    </div>
+                    <div class="mb-2">
+                        <label>Contract Number</label>
+                        <input type="text" class="form-control" id="edit_contract_number">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-primary" onclick="updateItem()">บันทึกการแก้ไข</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="qrModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="qrModalLabel"><i class="fas fa-qrcode me-2"></i>QR Code</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <img id="qrDisplayImage" src="" class="img-fluid border p-2 mb-3" style="width: 200px; height: 200px; object-fit: contain;">
+                <p class="text-muted small mb-3">สแกนเพื่อเข้าสู่หน้ายืมอุปกรณ์</p>
+                <a id="qrDownloadBtn" href="" download class="btn btn-primary w-100">
+                    <i class="fas fa-download me-1"></i> ดาวน์โหลดภาพ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous" onerror="this.onerror=null;var s=document.createElement('script');s.src='/frontend/vendor/bootstrap.bundle.min.js';document.head.appendChild(s);"></script>
+    <script src="admin-script.js"></script>
+   <script>
+    // สร้างตัวแปรไว้เช็ค เพื่อไม่ให้โหลด API ซ้ำซ้อน
+    let isInitialLoad = true;
+
+    function showSection(section) {
+        localStorage.setItem('activePage', section);
+
+        // แสดง/ซ่อน Section
+        document.getElementById('dashboard-section').style.display = section === 'dashboard' ? 'block' : 'none';
+        document.getElementById('inventory-section').style.display = section === 'inventory' ? 'block' : 'none';
+        document.getElementById('logs-section').style.display = section === 'logs' ? 'block' : 'none';
+        
+        // อัปเดตเมนู
+        const navDash = document.getElementById('nav-dashboard');
+        const navInv = document.getElementById('nav-inventory');
+        if(navDash) navDash.classList.toggle('active', section === 'dashboard');
+        if(navInv) navInv.classList.toggle('active', section === 'inventory');
+
+        // โหลดข้อมูลเฉพาะเมื่อจำเป็น
+        if (section === 'inventory' && !isInitialLoad) {
+            if (typeof loadInventory === 'function') loadInventory(1);
+        }
+        if (section === 'logs' && !isInitialLoad) {
+            if (typeof loadBorrowingLogs === 'function') loadBorrowingLogs();
+        }
+    }
+
+    window.onload = function() {
+        const savedPage = localStorage.getItem('activePage') || 'dashboard';
+        
+        // แสดง Section ก่อนเพื่อให้ UI ขึ้นทันที (ความรู้สึกจะเร็วขึ้น)
+        showSection(savedPage);
+        
+        // ถ้าเป็นหน้า inventory ให้โหลดข้อมูลแค่ครั้งเดียวตรงนี้
+        if (savedPage === 'inventory' && typeof loadInventory === 'function') {
+            loadInventory(1);
+        }
+        
+        // ปลดล็อกให้การคลิกครั้งต่อไปโหลดข้อมูลปกติ
+        isInitialLoad = false; 
+    };
+</script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-FLUcbe/HyR7RDlQ/tVjnCtAXSmWRs84gfJ0NLGRFO6X3LkZQ69RCJwA0E2crZluB" crossorigin="anonymous" onerror="this.onerror=null;var s=document.createElement('script');s.src='/frontend/vendor/sweetalert2.all.min.js';document.head.appendChild(s);"></script>
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
 </body>
 
 </html>

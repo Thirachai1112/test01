@@ -85,6 +85,7 @@
         }
         .btn-borrow:disabled { background: #ccc; box-shadow: none; }
 
+<<<<<<< HEAD
         /* ปุ่มคืน */
         .btn-return {
             background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
@@ -105,6 +106,8 @@
         }
         .btn-return:disabled { background: #ccc; box-shadow: none; }
 
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
         /* ปรับแต่ง SweetAlert ให้เหมาะกับมือถือ */
         .swal2-input, .swal2-textarea { font-size: 16px !important; } /* ป้องกัน iOS ซูมหน้าจอเมื่อคลิก */
     </style>
@@ -161,11 +164,14 @@
                             <i class="fas fa-hand-pointer"></i> 
                             ${isAvailable ? 'นำไปซ่อม' : 'ถูกนำไปซ่อมอยู่'}
                         </button>
+<<<<<<< HEAD
 
                         <button class="btn-return" onclick="returnItem('${item.item_id}')" ${isAvailable ? 'disabled' : ''}>
                             <i class="fas fa-undo"></i> 
                             ${!isAvailable ? 'คืนอุปกรณ์' : 'ไม่สามารถคืนได้ (ว่างอยู่)'}
                         </button>
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     `;
                 })
                 .catch(err => {
@@ -267,6 +273,7 @@
                     <div style="text-align: left;">
                         <label class="swal2-label">ยี่ห้อเครื่อง/รุ่น</label>
                         <input id="swal-input1" class="swal2-input" placeholder="ยี่ห้อเครื่อง/รุ่น">
+<<<<<<< HEAD
                         <input id="swal-input2" class="swal2-input" placeholder="เลขที่สัญญา">
                         <input id="swal-input3" class="swal2-input" placeholder="Serial Number">
                         <input id="swal-input4" class="swal2-input" placeholder="เลขทรัพย์สิน">
@@ -275,6 +282,13 @@
                         <input id="swal-input7" class="swal2-input" placeholder="เบอร์โทรศัพท์เจ้าของเครื่อง">
                         <input id="swal-input8" class="swal2-input" placeholder="สังกัด/แผนก">
                         <textarea id="swal-input9" class="swal2-textarea" placeholder="อาการที่ชำรุด"></textarea>
+=======
+                        <input id="swal-input4" class="swal2-input" placeholder="เลขที่สัญญา">
+                        <input id="swal-input2" class="swal2-input" placeholder="Serial Number">
+                        <input id="swal-input3" class="swal2-input" placeholder="เลขทรัพย์สิน">
+                        <input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">
+                        <textarea id="swal-input6" class="swal2-textarea" placeholder="อาการที่ชำรุด"></textarea>
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         
                         <label class="swal2-label" style="display: block; margin-top: 15px;">แนบหลักฐาน (รูปภาพสภาพเครื่อง/เอกสาร)</label>
                         <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf,.docx" style="display: block; width: 100%; margin-top: 5px;">
@@ -285,6 +299,7 @@
                 cancelButtonText: 'ยกเลิก',
                 focusConfirm: false,
                 preConfirm: () => {
+<<<<<<< HEAD
                     const brand = document.getElementById('swal-input1').value;
                     const contractNumber = document.getElementById('swal-input2').value;
                     const serialNumber = document.getElementById('swal-input3').value;
@@ -330,6 +345,14 @@
                     formData.append('item_id', id);
                     
                     // เพิ่มไฟล์ (ชื่อ 'files' ต้องตรงกับ Backend)
+=======
+                    const firstName = document.getElementById('swal-input1').value;
+                    const empCode = document.getElementById('swal-input3').value;
+                    
+                   
+           
+                    // เพิ่มไฟล์เข้าไปใน FormData (ชื่อ 'files' ต้องตรงกับ Backend)
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     if (result.value.files.length > 0) {
                         for (let i = 0; i < result.value.files.length; i++) {
                             formData.append('files', result.value.files[i]);
@@ -343,6 +366,7 @@
                         didOpen: () => { Swal.showLoading(); }
                     });
 
+<<<<<<< HEAD
                     // ส่ง POST ไปที่ /api/repair
                     fetch(`http://${SERVER_IP}:5000/api/repair`, {
                         method: 'POST',
@@ -359,10 +383,28 @@
                     })
                     .catch(err => {
                         Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err.message, 'error');
+=======
+                    fetch(`http://${SERVER_IP}:5000/borrow`, {
+                        method: 'POST',
+                        body: formData // ส่งเป็น formData แทน JSON
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.message && !data.error) {
+                            Swal.fire('สำเร็จ!', 'บันทึกการซ่อมเรียบร้อย', 'success')
+                                .then(() => location.reload());
+                        } else {
+                            Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
+                        }
+                    })
+                    .catch(err => {
+                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     });
                 }
             });
         }
+<<<<<<< HEAD
 
         function returnItem(id) {
             // ดึงข้อมูลการยืมที่ยังไม่ได้คืน
@@ -432,6 +474,8 @@
                     Swal.fire('ผิดพลาด', 'ไม่สามารถดึงข้อมูลการยืมได้: ' + err.message, 'error');
                 });
         }
+=======
+>>>>>>> 442d9451970f7af6897cb31123546de110af8576
     </script>
 </body>
 </html>
