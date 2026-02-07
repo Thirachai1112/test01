@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายการกำลังยืม - ระบบยืมคืน</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+       body {
+            background: linear-gradient(135deg, #e2e0dd 0%, #f1c40f 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+            font-family: 'Sarabun', sans-serif;
+        }
+        .container-custom {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin: auto;
+            max-width: 95%;
+        }
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f1c40f;
+            padding-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-custom">
+        <div class="header">
+            <h1 class="h3"><i class="fas fa-hand-holding me-2"></i> รายการที่กำลังยืมอยู่</h1>
+             <a href="index.html" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i> กลับหน้าหลัก
+        </a>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark p-3 text-center border-0 shadow-sm">
+                    <i class="fas fa-clock mb-2 fa-2x"></i>
+                    <div class="h2 font-weight-bold" id="borrowed-count">0</div>
+                    <div class="small">รายการที่ยังไม่คืน</div>
+                </div>
+            </div>
+            <div class="col-md-9">
+                 <input type="text" id="inventory-search" class="form-control form-control-lg mb-3" 
+                        oninput="searchInventory()" placeholder="🔍 ค้นหาชื่อผู้ยืม, ชื่ออุปกรณ์, Serial Number...">
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>ผู้ยืม</th>
+                        <th>หน่วยงาน</th>
+                        <th>อุปกรณ์</th>
+                        <th>Serial</th>
+                        <th>วันที่ยืม</th>
+                        <th>กำหนดคืน</th>
+                        <th>สถานะ</th>
+                        <th>หลักฐาน</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-list">
+                    <tr><td colspan="9" class="text-center">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center" id="pagination-container"></ul>
+        </nav>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="borrowed-script.js"></script>
+</body>
+</html>

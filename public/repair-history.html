@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประวัติการซ่อมแซม</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            color: #333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .search-section {
+            margin-bottom: 20px;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card i {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+        .stat-card .number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            margin-top: 20px;
+        }
+        table thead {
+            background-color: #667eea;
+            color: white;
+        }
+        table th {
+            font-weight: bold;
+            text-align: center;
+            padding: 12px;
+        }
+        table td {
+            padding: 10px;
+            vertical-align: middle;
+        }
+        table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .badge {
+            font-size: 0.75em;
+            padding: 4px 8px;
+            margin: 2px;
+        }
+        .badge-info {
+            background-color: #17a2b8;
+        }
+        .badge-secondary {
+            background-color: #6c757d;
+        }
+        .pagination {
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .pagination .page-link {
+            color: #667eea;
+        }
+        .pagination .page-link:hover {
+            background-color: #667eea;
+            color: white;
+        }
+        .pagination .page-item.active .page-link {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+        .search-input {
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 10px 15px;
+            width: 100%;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .no-data i {
+            font-size: 3em;
+            margin-bottom: 10px;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <i class="fas fa-tools"></i>
+                ประวัติการซ่อมแซมอุปกรณ์
+            </h1>
+        </div>
+
+        <div class="search-section">
+            <input type="text" id="search-input" class="search-input" placeholder="🔍 ค้นหา: ชื่อเจ้าของ, ยี่ห้อ, หมายเลขเครื่อง...">
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <i class="fas fa-wrench"></i>
+                <div class="number" id="totalRepairs">0</div>
+                <div class="label">การซ่อมทั้งหมด</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table table-hover table-sm" id="repairTable">
+                <thead>
+                    <tr>
+                        <th>ลำดับ</th>
+                        <th>ชื่อเจ้าของ</th>
+                        <th>รหัสพนักงาน</th>
+                        <th>เบอร์โทร</th>
+                        <th>แบรนด์</th>
+                        <th>เลขเครื่อง</th>
+                        <th>เลขสินค้า</th>
+                        <th>หน่วยงาน</th>
+                        <th>ปัญหา</th>
+                        <th>ไฟล์</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <div id="no-data" class="no-data" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <p>ไม่พบข้อมูลการซ่อม</p>
+            </div>
+        </div>
+
+        <nav aria-label="Page navigation">
+            <ul class="pagination" id="pagination"></ul>
+        </nav>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentPage = 1;
+        let repairLogsPerPage = 10;
+        let allRepairLogs = [];
+        let filteredRepairLogs = [];
+
+        // เมื่อ Load หน้า ให้ดึงข้อมูล
+        window.addEventListener('DOMContentLoaded', () => {
+            loadRepairHistory(1);
+            
+            // เมื่อกดปุ่มค้นหา
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchRepairs();
+                }
+            });
+        });
+
+        function loadRepairHistory(page = 1) {
+            const searchTerm = document.getElementById('search-input')?.value || '';
+            const url = `http://localhost:5000/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${encodeURIComponent(searchTerm)}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        allRepairLogs = data.data;
+                        filteredRepairLogs = data.data;
+                        currentPage = page;
+                        displayRepairs();
+                        displayPagination(data.pagination);
+                        
+                        // อัปเดตสถิติ
+                        document.getElementById('totalRepairs').textContent = data.pagination.totalRecords;
+                        
+                        // ซ่อน/แสดง "ไม่พบข้อมูล"
+                        const tbody = document.querySelector('#repairTable tbody');
+                        document.getElementById('no-data').style.display = tbody.rows.length === 0 ? 'block' : 'none';
+                    }
+                })
+                .catch(err => console.error('❌ Error:', err));
+        }
+
+        function displayRepairs() {
+            const tbody = document.querySelector('#repairTable tbody');
+            tbody.innerHTML = '';
+            
+            const start = (currentPage - 1) * repairLogsPerPage;
+            
+            filteredRepairLogs.forEach((repair, index) => {
+                let fileBadges = '';
+                if (repair.file_paths && repair.file_paths.length > 0) {
+                    repair.file_paths.forEach(filePath => {
+                        const fileName = filePath.split('/').pop();
+                        fileBadges += `<a href="http://localhost:5000/${filePath}" class="badge badge-info" download>
+                            <i class="fas fa-download"></i> ${fileName.substring(0, 12)}...
+                        </a> `;
+                    });
+                } else {
+                    fileBadges = '<span class="badge badge-secondary">ไม่มีไฟล์</span>';
+                }
+                
+                const problemText = repair.problem ? repair.problem.substring(0, 25) : '-';
+                const employeeName = repair.employee_name ? repair.employee_name.trim() : '-';
+                const employeeCode = repair.employees_code || '-';
+                const phoneNumber = repair.phone_number || '-';
+                
+                const row = `<tr>
+                    <td>${start + index + 1}</td>
+                    <td><strong>${employeeName}</strong></td>
+                    <td>${employeeCode}</td>
+                    <td>${phoneNumber}</td>
+                    <td>${repair.brand || '-'}</td>
+                    <td>${repair.serial_number || '-'}</td>
+                    <td>${repair.asset_number || '-'}</td>
+                    <td>${repair.affiliation || '-'}</td>
+                    <td>${problemText}${repair.problem && repair.problem.length > 25 ? '...' : ''}</td>
+                    <td>${fileBadges}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function displayPagination(pagination) {
+            const paginationDiv = document.getElementById('pagination');
+            paginationDiv.innerHTML = '';
+
+            // ปุ่ม Previous
+            const prevBtn = document.createElement('li');
+            prevBtn.className = `page-item ${!pagination.hasPrevPage ? 'disabled' : ''}`;
+            prevBtn.innerHTML = `<a class="page-link" href="#" onclick="loadRepairHistory(${pagination.currentPage - 1}); return false;">← ก่อนหน้า</a>`;
+            paginationDiv.appendChild(prevBtn);
+
+            // หมายเลขหน้า
+            for (let i = 1; i <= Math.min(pagination.totalPages, 5); i++) {
+                const pageBtn = document.createElement('li');
+                pageBtn.className = `page-item ${i === pagination.currentPage ? 'active' : ''}`;
+                pageBtn.innerHTML = `<a class="page-link" href="#" onclick="loadRepairHistory(${i}); return false;">${i}</a>`;
+                paginationDiv.appendChild(pageBtn);
+            }
+
+            // ปุ่ม Next
+            const nextBtn = document.createElement('li');
+            nextBtn.className = `page-item ${!pagination.hasNextPage ? 'disabled' : ''}`;
+            nextBtn.innerHTML = `<a class="page-link" href="#" onclick="loadRepairHistory(${pagination.currentPage + 1}); return false;">ถัดไป →</a>`;
+            paginationDiv.appendChild(nextBtn);
+        }
+
+        function searchRepairs() {
+            loadRepairHistory(1);
+        }
+    </script>
+</body>
+</html>

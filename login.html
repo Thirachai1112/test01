@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ | Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Kanit', sans-serif;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .login-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        .login-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .remember-me input {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .back-link a:hover {
+            color: #764ba2;
+        }
+
+        .icon-input {
+            position: relative;
+        }
+
+        .icon-input i {
+            position: absolute;
+            left: 15px;
+            top: 42px;
+            color: #999;
+        }
+
+        .icon-input input {
+            padding-left: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h1><i class="fas fa-lock me-2"></i>Admin Login</h1>
+            <p>เข้าสู่ระบบผู้ดูแลระบบ</p>
+        </div>
+
+        <div class="login-body">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username"><i class="fas fa-user me-2"></i>ชื่อผู้ใช้</label>
+                    <input type="text" id="username" class="form-control" placeholder="กรอกชื่อผู้ใช้" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password"><i class="fas fa-key me-2"></i>รหัสผ่าน</label>
+                    <input type="password" id="password" class="form-control" placeholder="กรอกรหัสผ่าน" required>
+                </div>
+
+                <div class="remember-me">
+                    <input type="checkbox" id="remember" class="form-check-input">
+                    <label for="remember" class="form-check-label ms-2">จำรหัสผ่านของฉัน</label>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-sign-in-alt me-2"></i>เข้าสู่ระบบ
+                </button>
+            </form>
+
+            <div class="back-link">
+                <a href="Default.html"><i class="fas fa-arrow-left me-2"></i>กลับไปหน้าหลัก</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.1/dist/sweetalert2.all.min.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+
+            try {
+                // แสดง Loading
+                Swal.fire({
+                    title: 'กำลังเข้าสู่ระบบ...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const response = await fetch('http://localhost:5000/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // บันทึก token ไป localStorage
+                    localStorage.setItem('adminToken', data.token);
+                    localStorage.setItem('adminUser', data.admin_id);
+                    
+                    if (remember) {
+                        localStorage.setItem('rememberUsername', username);
+                    }
+
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'เข้าสู่ระบบสำเร็จ!',
+                        text: 'ยินดีต้อนรับสู่ Admin Dashboard',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+
+                    // เปลี่ยนไปหน้า dashboard
+                    window.location.href = 'frontend/admin/index.html';
+                } else {
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'เข้าสู่ระบบล้มเหลว',
+                        text: data.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+                    });
+                }
+            } catch (error) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้'
+                });
+            }
+        });
+
+        // โหลด username จาก localStorage หากมีการจำไว้
+        window.addEventListener('load', () => {
+            const rememberUsername = localStorage.getItem('rememberUsername');
+            if (rememberUsername) {
+                document.getElementById('username').value = rememberUsername;
+                document.getElementById('remember').checked = true;
+            }
+        });
+    </script>
+
+</body>
+</html>

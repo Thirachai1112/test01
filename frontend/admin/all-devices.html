@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>อุปกรณ์ทั้งหมด - ระบบยืมคืน</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+       body {
+        background: linear-gradient(135deg, #b7b9c2 0%, #1405db 100%);
+        min-height: 100vh;
+        padding: 20px 0;
+        font-family: 'Sarabun', sans-serif;
+    }
+    .container-custom {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        padding: 30px;
+        margin: auto;
+        max-width: 95%;
+    }
+    .header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #6994df 0%, #0942e0 100%); /* สีแดง/ส้ม สำหรับงานซ่อม */
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+<body>
+
+<div class="main-content container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-box me-2"></i>อุปกรณ์ทั้งหมด</h2>
+         <a href="index.html" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i> กลับหน้าหลัก
+        </a>
+        
+    </div>
+    <div style="display: none;">
+    <span id="usernameDisplay"></span>
+    <h2 id="total-items">0</h2>
+    <h2 id="total-available">0</h2>
+    <h2 id="total-borrowed">0</h2>
+    <h2 id="total-repair">0</h2>
+</div>
+<div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <i class="fas fa-boxes mb-2 fa-2x"></i>
+                <div class="h2 font-weight-bold" id="total-count">0</div>
+                <div class="small">อุปกรณ์ทั้งหมด</div>
+            </div>
+        </div>
+        <div class="col-md-9">
+             <input type="text" id="search-input" class="form-control form-control-lg mb-3" 
+                    placeholder="🔍 ค้นหาอุปกรณ์ทั้งหมด..." oninput="searchAllDevices()">
+        </div>
+    </div>
+
+<div class="card p-4">
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">รูปภาพ</th>
+                    <th>ชื่ออุปกรณ์</th>
+                    <th>เลขสัญญา</th>
+                    <th>Asset Number</th>
+                    <th>Serial Number</th>
+                    <th>หมวดหมู่</th>
+                    <th>สถานะ</th>
+                    <th class="text-center">QR</th>
+                    <th class="text-center">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="inventory-list">
+                </tbody>
+        </table>
+    </div>
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center" id="pagination-container"></ul>
+    </nav>
+</div>
+
+ <div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>แก้ไขข้อมูลอุปกรณ์</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editItemForm">
+                        <input type="hidden" id="edit_item_id">
+
+                        <div class="mb-3 text-center">
+                            <img id="edit_preview" src="https://via.placeholder.com/150" class="rounded mb-2 border"
+                                style="width: 150px; height: 150px; object-fit: contain;">
+                            <input type="file" class="form-control" id="edit_imageInput" accept="image/*"
+                                onchange="previewImageEdit(event)">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">ชื่ออุปกรณ์</label>
+                            <input type="text" class="form-control" id="edit_item_name" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ประเภทอุปกรณ์</label>
+                                <select id="edit_cat_id" class="form-select">
+                                    <option value="1">Laptop / Computer</option>
+                                    <option value="2">อุปกรณ์สำนักงาน</option>
+                                    <option value="3">Switch / Network</option>
+                                    <option value="4">อะไหล่คอมพิวเตอร์</option>
+                                    <option value="5">สื่อบันทึกข้อมูล</option>
+                                    <option value="6">เครื่องมือช่าง</option>
+                                    <option value="6">เครื่องพิมพ์เอกสาร</option>
+                                    <option value="8">Mouse & Keyboard</option>
+
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">สถานะ</label>
+                                <select class="form-select" id="edit_status">
+                                    <option value="Available">Available</option>
+                                    <option value="Borrowed">Borrowed</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label>Asset Number</label>
+                            <input type="text" class="form-control" id="edit_asset_number">
+                        </div>
+                        <div class="mb-2">
+                            <label>Serial Number</label>
+                            <input type="text" class="form-control" id="edit_serial_number">
+                        </div>
+                        <div class="mb-2">
+                            <label>Contract Number</label>
+                            <input type="text" class="form-control" id="edit_contract_number">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="button" class="btn btn-primary" onclick="updateItem()">บันทึกการแก้ไข</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="qrModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="qrModalLabel"><i class="fas fa-qrcode me-2"></i>QR Code</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <img id="qrDisplayImage" src="" class="img-fluid border p-2 mb-3"
+                        style="width: 200px; height: 200px; object-fit: contain;">
+                    <p class="text-muted small mb-3">สแกนเพื่อเข้าสู่หน้ายืมอุปกรณ์</p>
+                    <a id="qrDownloadBtn" href="" download class="btn btn-primary w-100">
+                        <i class="fas fa-download me-1"></i> ดาวน์โหลดภาพ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.7.3/sweetalert2.all.min.js"></script>
+<script>
+    const CONFIG = { API_BASE: `http://${window.location.hostname}:5000` };
+</script>
+<script src="all-devices-script.js"></script>
+
+</body>
+</html>
