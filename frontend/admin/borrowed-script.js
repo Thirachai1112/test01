@@ -33,7 +33,9 @@ function renderTable() {
     const tbody = document.getElementById('logs-list');
     const start = (state.currentPage - 1) * state.rowsPerPage;
     const end = start + state.rowsPerPage;
+    const offset = (state.currentPage - 1) * state.rowsPerPage;
     const paginatedItems = state.filteredLogs.slice(start, end);
+    
 
     tbody.innerHTML = '';
 
@@ -53,15 +55,15 @@ function renderTable() {
             const files = typeof log.file_paths === 'string' ? JSON.parse(log.file_paths) : log.file_paths;
             fileHtml = files.map(file => {
                 const filename = file.split('/').pop();
-                return `<a href="${CONFIG.API_BASE}${file}" target="_blank" class="btn btn-sm btn-outline-primary p-1 me-1"><i class="fas fa-file-alt"></i></a>`;
+                return `<a href="${CONFIG.API_BASE}${file}" target="_blank" class="btn btn-sm btn-outline-primary p-1 me-1" title="${filename}"><i class="fas fa-file-alt"></i></a>`;
             }).join('');
         }
 
         tbody.innerHTML += `
             <tr>
-                <td><small>#${log.log_id}</small></td>
-                <td><strong>${log.first_name} ${log.last_name || ''}</strong></td>
-                <td><small>${log.affiliation || '-'}</small></td>
+                <td><small>#${offset + (state.filteredLogs.indexOf(log) + 1)}</small></td>
+                <td>${log.employee_name || '-'}</td>
+                <td><small>${log.Affiliation || '-'}</small></td>
                 <td>${log.item_name || '-'}</td>
                 <td><code>${log.serial_number || '-'}</code></td>
                 <td><small>${borrowDate}</small></td>

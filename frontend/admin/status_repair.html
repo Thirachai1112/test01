@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Tracking | Modern Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --pending-color: #ff4d6d;
+            --progress-color: #fb8500;
+            --fixed-color: #06d6a0;
+            --bg-color: #f8f9fc;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Kanit', 'Sarabun', sans-serif;
+            padding: 30px 15px;
+        }
+
+        .container-custom {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            padding: 35px;
+        }
+
+        .header-title {
+            color: #2b2d42;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .table-responsive {
+            border-radius: 16px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .table {
+            border-collapse: separate;
+            border-spacing: 0 8px;
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background: transparent;
+            border: none;
+            color: #8d99ae;
+            font-weight: 500;
+            font-size: 0.85rem;
+            padding: 15px;
+        }
+
+        .table tbody tr {
+            background: white;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .table tbody tr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            background: #fff;
+        }
+
+        .table td {
+            border: none;
+            padding: 20px 15px;
+            vertical-align: middle;
+        }
+
+        .table td:first-child { border-radius: 12px 0 0 12px; }
+        .table td:last-child { border-radius: 0 12px 12px 0; }
+
+        /* Status Badges */
+        .status-pill {
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-pending { background: #fff1f2; color: var(--pending-color); }
+        .status-progress { background: #fff8eb; color: var(--progress-color); }
+        .status-fixed { background: #e6fcf5; color: var(--fixed-color); }
+
+        /* Icon Buttons */
+        .btn-action {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-view { background: #edf2ff; color: var(--primary-color); }
+        .btn-view:hover { background: var(--primary-color); color: white; }
+
+        .btn-update { background: #f8f9fa; color: #333; font-size: 0.8rem; padding: 5px 15px; width: auto; }
+        .btn-update:hover { background: #e9ecef; }
+
+        code.sn-code {
+            background: #f1f3f5;
+            color: #495057;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .contract-code {
+            color: var(--primary-color);
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid container-custom">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+            <div>
+                <h3 class="header-title mb-1"><i class="fas fa-microchip text-primary me-2"></i>ระบบบริหารงานซ่อม</h3>
+                <p class="text-muted small mb-0">ติดตามและจัดการสถานะอุปกรณ์ส่งซ่อมแบบ Real-time</p>
+            </div>
+            <button class="btn btn-white shadow-sm rounded-pill px-4 btn-sm border" onclick="loadRepairData()">
+                <i class="fas fa-sync-alt me-2 text-primary"></i> อัปเดตข้อมูล
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ลำดับ</th>
+                        <th>ข้อมูลผู้แจ้ง</th>
+                        <th>อุปกรณ์ / รุ่น</th>
+                        <th>รหัส S/N</th>
+                        <th>เลขที่สัญญา</th>
+                        <th>อาการเสีย</th>
+                        <th>วันที่แจ้ง</th>
+                        <th>สถานะ</th>
+                        <th>หลักฐาน</th>
+                        <th class="text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="repair-table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API_BASE = "http://192.168.1.159:5000";
+
+        async function loadRepairData() {
+            try {
+                const res = await fetch(`${API_BASE}/api/repair-status`);
+                const result = await res.json();
+                if (result.success) displayRepairs(result.data);
+            } catch (err) { console.error("Error:", err); }
+        }
+
+        function displayRepairs(repairs) {
+            const body = document.getElementById('repair-table-body');
+            body.innerHTML = '';
+
+            repairs.forEach(repair => {
+                const date = new Date(repair.created_at).toLocaleDateString('th-TH', {
+                    day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+                });
+
+                // File Handling Logic
+                let fileHtml = '-';
+                if (repair.repair_url) {
+                    const files = repair.repair_url.split(',');
+                    fileHtml = files.map(filename => {
+                        let cleanName = filename.trim().replace(/^\/+/, '');
+                        if (!cleanName) return '';
+                        let finalPath = cleanName.includes('uploads/') ? cleanName : `uploads/repairs/${cleanName}`;
+                        let fullUrl = `${API_BASE}/${finalPath}`.replace(/([^:]\/)\/+/g, "$1");
+                        return `<a href="${fullUrl}" target="_blank" class="btn-action btn-view me-1"><i class="fas fa-file-invoice"></i></a>`;
+                    }).join('');
+                }
+
+                const statusClass = repair.status === 'Pending' ? 'status-pending' : (repair.status === 'In Progress' ? 'status-progress' : 'status-fixed');
+                const statusText = repair.status === 'Pending' ? '<i class="fas fa-clock"></i> รอรับเรื่อง' : (repair.status === 'In Progress' ? '<i class="fas fa-tools"></i> กำลังซ่อม' : '<i class="fas fa-check-circle"></i> เสร็จสิ้น');
+
+                body.innerHTML += `
+                    <tr>
+                        <td><span class="text-muted small">#${repair.repair_id}</span></td>
+                        <td>
+                            <div class="fw-bold">${repair.employee_name || 'ไม่ระบุ'}</div>
+                            <div class="text-muted small">${repair.department || '-'}</div>
+                        </td>
+                        <td><div class="fw-medium text-dark">${repair.brand || '-'}</div></td>
+                        <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
+                        <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
+                        <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
+                        <td><small class="text-muted">${date}</small></td>
+                        <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+                        <td>${fileHtml}</td>
+                        <td class="text-center">
+                            ${repair.status === 'Pending' 
+                                ? `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`
+                                : `<button class="btn btn-update shadow-sm text-success" onclick="finishRepair(${repair.repair_id}, ${repair.item_id})">ปิดงาน</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Logic functions (updateStatus, finishRepair) remains same as previous version but linked here
+        async function updateStatus(repairId, status) {
+            const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (res.ok) loadRepairData();
+        }
+
+        async function finishRepair(repairId, itemId) {
+            const confirm = await Swal.fire({
+                title: 'ยืนยันการซ่อมเสร็จสิ้น?',
+                text: "สถานะอุปกรณ์จะถูกเปลี่ยนเป็น 'พร้อมใช้งาน'",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#06d6a0'
+            });
+            if (confirm.isConfirmed) {
+                const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Fixed', item_id: itemId })
+                });
+                if (res.ok) {
+                    Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
+                    loadRepairData();
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadRepairData);
+    </script>
+</body>
+</html>

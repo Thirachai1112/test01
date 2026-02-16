@@ -1,66 +1,87 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>รายละเอียดอุปกรณ์</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' http://${SERVER_IP}:5000; img-src 'self' data: http://*:*; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;">
+    <title>รายละเอียดอุปกรณ์</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* 🎨 ปรับปรุงพื้นฐานให้เหมาะกับมือถือ */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            padding: 15px; 
-            line-height: 1.6; 
-            background-color: #f0f2f5; 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 15px;
+            line-height: 1.6;
+            background-color: #f0f2f5;
             color: #333;
         }
 
         /* 📱 Card ปรับขนาดตามหน้าจออัตโนมัติ */
-        .card { 
-            border: none; 
-            padding: 20px; 
-            border-radius: 15px; 
+        .card {
+            border: none;
+            padding: 20px;
+            border-radius: 15px;
             width: 100%;
-            max-width: 500px; 
-            background: white; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-            margin: 10px auto; 
+            max-width: 500px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin: 10px auto;
         }
 
-        .back-link { margin-bottom: 20px; }
-        .back-link a { 
-            text-decoration: none; 
-            color: #555; 
-            font-size: 14px; 
-            display: inline-flex; 
-            align-items: center; 
+        .back-link {
+            margin-bottom: 20px;
         }
 
-        h2 { color: #1a73e8; margin-bottom: 15px; font-size: 1.5rem; text-align: center; }
+        .back-link a {
+            text-decoration: none;
+            color: #555;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+        }
 
-        .info-row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 8px 0; 
-            border-bottom: 1px solid #eee; 
+        h2 {
+            color: #1a73e8;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
             font-size: 14px;
         }
-        .info-label { font-weight: bold; color: #666; }
 
-        img { 
-            width: 100%; 
-            max-height: 300px; 
-            object-fit: contain; 
-            margin: 20px 0; 
-            border-radius: 10px; 
+        .info-label {
+            font-weight: bold;
+            color: #666;
+        }
+
+        img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            margin: 20px 0;
+            border-radius: 10px;
             background: #fafafa;
         }
 
-        .status-badge { 
-            padding: 4px 12px; 
-            border-radius: 20px; 
-            font-size: 12px; 
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: bold;
             color: white;
         }
@@ -83,9 +104,12 @@
             align-items: center;
             gap: 10px;
         }
-        .btn-borrow:disabled { background: #ccc; box-shadow: none; }
 
-<<<<<<< HEAD
+        .btn-borrow:disabled {
+            background: #ccc;
+            box-shadow: none;
+        }
+
         /* ปุ่มคืน */
         .btn-return {
             background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
@@ -104,14 +128,22 @@
             align-items: center;
             gap: 10px;
         }
-        .btn-return:disabled { background: #ccc; box-shadow: none; }
 
-=======
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
+        .btn-return:disabled {
+            background: #ccc;
+            box-shadow: none;
+        }
+
         /* ปรับแต่ง SweetAlert ให้เหมาะกับมือถือ */
-        .swal2-input, .swal2-textarea { font-size: 16px !important; } /* ป้องกัน iOS ซูมหน้าจอเมื่อคลิก */
+        .swal2-input,
+        .swal2-textarea {
+            font-size: 16px !important;
+        }
+
+        /* ป้องกัน iOS ซูมหน้าจอเมื่อคลิก */
     </style>
 </head>
+
 <body>
     <div class="card">
         <div id="content">
@@ -120,15 +152,18 @@
     </div>
 
     <script>
+        let currentItemData = null;
         const urlParams = new URLSearchParams(window.location.search);
         const itemId = urlParams.get('id');
         const SERVER_IP = window.location.hostname;
+
 
         if (itemId) {
             fetch(`http://${SERVER_IP}:5000/items/${itemId}`)
                 .then(response => response.json())
                 .then(data => {
-                    const item = data.items ? data.items[0] : data;
+                    currentItemData = data.items ? data.items[0] : data;
+                    const item = currentItemData;
                     const isAvailable = item.status === 'Available';
 
                     document.getElementById('content').innerHTML = `
@@ -151,8 +186,8 @@
                             <span>${item.serial_number || '-'}</span>
                         </div>
 
-                        ${item.image_url 
-                            ? `<img src="http://${SERVER_IP}:5000/uploads/${item.image_url}" alt="รูปอุปกรณ์" onerror="this.src='https://via.placeholder.com/400x300?text=ไม่มีรูปภาพ'">` 
+                        ${item.image_url
+                            ? `<img src="http://${SERVER_IP}:5000/uploads/${item.image_url}" alt="รูปอุปกรณ์" onerror="this.src='https://via.placeholder.com/400x300?text=ไม่มีรูปภาพ'">`
                             : '<div style="height:100px; display:flex; align-items:center; justify-content:center; color:#ccc;">ไม่มีรูปภาพประกอบ</div>'}
                         
                         <button class="btn-borrow" onclick="borrowItem('${item.item_id}')" ${!isAvailable ? 'disabled' : ''}>
@@ -164,14 +199,11 @@
                             <i class="fas fa-hand-pointer"></i> 
                             ${isAvailable ? 'นำไปซ่อม' : 'ถูกนำไปซ่อมอยู่'}
                         </button>
-<<<<<<< HEAD
 
                         <button class="btn-return" onclick="returnItem('${item.item_id}')" ${isAvailable ? 'disabled' : ''}>
                             <i class="fas fa-undo"></i> 
                             ${!isAvailable ? 'คืนอุปกรณ์' : 'ไม่สามารถคืนได้ (ว่างอยู่)'}
                         </button>
-=======
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     `;
                 })
                 .catch(err => {
@@ -203,7 +235,7 @@
                 preConfirm: () => {
                     const firstName = document.getElementById('swal-input1').value;
                     const empCode = document.getElementById('swal-input3').value;
-                    
+
                     if (!firstName || !empCode) {
                         Swal.showValidationMessage('กรุณาระบุชื่อและรหัสพนักงาน');
                         return false;
@@ -230,7 +262,7 @@
                     formData.append('phone_number', result.value.phone);
                     formData.append('affiliation', result.value.dept);
                     formData.append('purpose', result.value.purpose);
-                    
+
                     // เพิ่มไฟล์เข้าไปใน FormData (ชื่อ 'files' ต้องตรงกับ Backend)
                     if (result.value.files.length > 0) {
                         for (let i = 0; i < result.value.files.length; i++) {
@@ -249,162 +281,172 @@
                         method: 'POST',
                         body: formData // ส่งเป็น formData แทน JSON
                     })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.message && !data.error) {
-                            Swal.fire('สำเร็จ!', 'บันทึกการยืมและอัปโหลดหลักฐานเรียบร้อย', 'success')
-                                .then(() => location.reload());
-                        } else {
-                            Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
-                        }
-                    })
-                    .catch(err => {
-                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-                    });
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.message && !data.error) {
+                                Swal.fire('สำเร็จ!', 'บันทึกการยืมและอัปโหลดหลักฐานเรียบร้อย', 'success')
+                                    .then(() => location.reload());
+                            } else {
+                                Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                        });
                 }
             });
         }
 
 
-         function repairItem(id) {
+        function repairItem(id) {
+            // ดึงข้อมูลอุปกรณ์จากตัวแปร global ที่โหลดไว้ตอนเปิดหน้า (currentItemData)
+            // เพื่อนำมาใส่ในฟอร์มอัตโนมัติ
+            const item = currentItemData || {};
+
+
             Swal.fire({
-                title: 'ระบุข้อมูล',
+                title: '📋 แจ้งซ่อม / พบปัญหาอุปกรณ์',
+                width: '650px',
                 html: `
-                    <div style="text-align: left;">
-                        <label class="swal2-label">ยี่ห้อเครื่อง/รุ่น</label>
-                        <input id="swal-input1" class="swal2-input" placeholder="ยี่ห้อเครื่อง/รุ่น">
-<<<<<<< HEAD
-                        <input id="swal-input2" class="swal2-input" placeholder="เลขที่สัญญา">
-                        <input id="swal-input3" class="swal2-input" placeholder="Serial Number">
-                        <input id="swal-input4" class="swal2-input" placeholder="เลขทรัพย์สิน">
-                        <input id="swal-input5" class="swal2-input" placeholder="ชื่อผู้เจ้าของเครื่อง">
-                        <input id="swal-input6" class="swal2-input" placeholder="รหัสพนักงานเจ้าของเครื่อง">
-                        <input id="swal-input7" class="swal2-input" placeholder="เบอร์โทรศัพท์เจ้าของเครื่อง">
-                        <input id="swal-input8" class="swal2-input" placeholder="สังกัด/แผนก">
-                        <textarea id="swal-input9" class="swal2-textarea" placeholder="อาการที่ชำรุด"></textarea>
-=======
-                        <input id="swal-input4" class="swal2-input" placeholder="เลขที่สัญญา">
-                        <input id="swal-input2" class="swal2-input" placeholder="Serial Number">
-                        <input id="swal-input3" class="swal2-input" placeholder="เลขทรัพย์สิน">
-                        <input id="swal-input5" class="swal2-input" placeholder="สังกัด/แผนก">
-                        <textarea id="swal-input6" class="swal2-textarea" placeholder="อาการที่ชำรุด"></textarea>
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
-                        
-                        <label class="swal2-label" style="display: block; margin-top: 15px;">แนบหลักฐาน (รูปภาพสภาพเครื่อง/เอกสาร)</label>
-                        <input type="file" id="swal-input-file" class="swal2-file" multiple accept="image/*,.pdf,.docx" style="display: block; width: 100%; margin-top: 5px;">
-                    </div>
-                `,
+    <div style="text-align: left; font-family: 'Sarabun', sans-serif; color: #333;">
+        
+        <div style="background: #fdfdfd; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 20px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="margin-bottom: 12px;">
+                <label style="font-weight: bold; font-size: 14px; color: #555;">ยี่ห้อเครื่อง / รุ่น</label>
+                <input id="sw-brand" class="swal2-input" style="width: 100%; margin: 5px 0; height: 40px; font-size: 15px;" value="${item.item_name || ''}" placeholder="ระบุยี่ห้อ/รุ่น">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; font-size: 12px; color: #666;">Serial Number</label>
+                    <input id="sw-sn" class="swal2-input" style="width: 100%; margin: 5px 0; height: 38px; font-size: 13px; text-align: center;" value="${item.serial_number || ''}" placeholder="S/N">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; font-size: 12px; color: #666;">เลขที่สัญญา</label>
+                    <input id="sw-ct" class="swal2-input" style="width: 100%; margin: 5px 0; height: 38px; font-size: 13px; text-align: center;" value="${item.contract_number || ''}" placeholder="contract No.">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; font-size: 12px; color: #666;">เลขทรัพย์สิน</label>
+                    <input id="sw-asset" class="swal2-input" style="width: 100%; margin: 5px 0; height: 38px; font-size: 13px; text-align: center;" value="${item.asset_number || ''}" placeholder="Asset No.">
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 0 5px;">
+            <div style="margin-bottom: 12px;">
+                <label style="font-weight: bold; font-size: 14px;">ชื่อผู้แจ้ง / เจ้าของเครื่อง *</label>
+                <input id="sw-owner" class="swal2-input" style="width: 100%; margin: 5px 0; height: 40px; font-size: 15px;" placeholder="ระบุชื่อ-นามสกุล">
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 12px;">
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; font-size: 14px;">รหัสพนักงาน *</label>
+                    <input id="sw-code" class="swal2-input" style="width: 100%; margin: 5px 0; height: 40px; font-size: 15px;" placeholder="รหัสพนักงาน">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; font-size: 14px;">เบอร์โทรศัพท์</label>
+                    <input id="sw-phone" class="swal2-input" style="width: 100%; margin: 5px 0; height: 40px; font-size: 15px;" placeholder="08x-xxxxxxx">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold; font-size: 14px;">สังกัด / แผนก</label>
+                <input id="sw-dept" class="swal2-input" style="width: 100%; margin: 5px 0; height: 40px; font-size: 15px;" placeholder="ระบุแผนก">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold; font-size: 14px; color: #d63384;">อาการที่ชำรุด *</label>
+                <textarea id="sw-problem" class="swal2-textarea" style="width: 100%; margin: 5px 0; font-size: 14px; height: 90px; border-radius: 8px;" placeholder="กรุณาระบุรายละเอียดปัญหาที่พบ..."></textarea>
+            </div>
+            
+            <label style="font-weight: bold; font-size: 13px; color: #666;"><i class="fas fa-paperclip"></i> แนบรูปภาพ / หลักฐาน</label>
+            <input type="file" id="sw-file" class="swal2-file" style="width: 100%; font-size: 13px; margin-top: 5px; border: none;" multiple accept="image/*,.pdf">
+        </div>
+    </div>
+    `,
                 showCancelButton: true,
-                confirmButtonText: 'ยืนยันการนำไปซ่อม',
+                confirmButtonText: 'ส่งข้อมูลแจ้งซ่อม',
                 cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#ffc107',
                 focusConfirm: false,
                 preConfirm: () => {
-<<<<<<< HEAD
-                    const brand = document.getElementById('swal-input1').value;
-                    const contractNumber = document.getElementById('swal-input2').value;
-                    const serialNumber = document.getElementById('swal-input3').value;
-                    const assetNumber = document.getElementById('swal-input4').value;
-                    const ownerName = document.getElementById('swal-input5').value;
-                    const employeeCode = document.getElementById('swal-input6').value;
-                    const phoneNumber = document.getElementById('swal-input7').value;
-                    const affiliation = document.getElementById('swal-input8').value;
-                    const problem = document.getElementById('swal-input9').value;
-                    const fileInput = document.getElementById('swal-input-file');
+                    // ดึงค่าจาก HTML ของ Swal
+                    const data = {
+                        brand: document.getElementById('sw-brand').value,
+                        serial_number: document.getElementById('sw-sn').value,
+                        contract_number: document.getElementById('sw-ct').value,
+                        asset_number: document.getElementById('sw-asset').value,
+                        employee_name: document.getElementById('sw-owner').value,
+                        employees_code: document.getElementById('sw-code').value,
+                        phone_number: document.getElementById('sw-phone').value,
+                        affiliation: document.getElementById('sw-dept').value,
+                        problem: document.getElementById('sw-problem').value,
+                        files: document.getElementById('sw-file').files
+                    };
 
-                    if (!brand || !problem) {
-                        Swal.showValidationMessage('กรุณาระบุยี่ห้อและอาการที่ชำรุด');
+                    // ตรวจสอบข้อมูลที่จำเป็น (Validation)
+                    if (!data.employee_name || !data.employees_code || !data.problem) {
+                        Swal.showValidationMessage('กรุณากรอกชื่อ, รหัสพนักงาน และอาการชำรุด');
                         return false;
                     }
-
-                    return {
-                        brand: brand,
-                        contractNumber: contractNumber,
-                        serialNumber: serialNumber,
-                        assetNumber: assetNumber,
-                        ownerName: ownerName,
-                        employeeCode: employeeCode,
-                        phoneNumber: phoneNumber,
-                        affiliation: affiliation,
-                        problem: problem,
-                        files: fileInput.files
-                    };
+                    return data;
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // สร้าง FormData
                     const formData = new FormData();
-                    formData.append('brand', result.value.brand);
-                    formData.append('contract_number', result.value.contractNumber);
-                    formData.append('serial_number', result.value.serialNumber);
-                    formData.append('asset_number', result.value.assetNumber);
-                    formData.append('owner_name', result.value.ownerName);
-                    formData.append('employee_code', result.value.employeeCode);
-                    formData.append('phone_number', result.value.phoneNumber);
-                    formData.append('affiliation', result.value.affiliation);
-                    formData.append('problem', result.value.problem);
+
+                    // วนลูปเพิ่มข้อมูลตัวอักษรลงใน FormData
+                    Object.keys(result.value).forEach(key => {
+                        if (key !== 'files') {
+                            formData.append(key, result.value[key]);
+                        }
+                    });
+
+                    // เพิ่ม item_id เข้าไปด้วย
                     formData.append('item_id', id);
-                    
-                    // เพิ่มไฟล์ (ชื่อ 'files' ต้องตรงกับ Backend)
-=======
-                    const firstName = document.getElementById('swal-input1').value;
-                    const empCode = document.getElementById('swal-input3').value;
-                    
-                   
-           
-                    // เพิ่มไฟล์เข้าไปใน FormData (ชื่อ 'files' ต้องตรงกับ Backend)
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
-                    if (result.value.files.length > 0) {
-                        for (let i = 0; i < result.value.files.length; i++) {
-                            formData.append('files', result.value.files[i]);
+
+                    // เพิ่มไฟล์รูปภาพ/เอกสาร (กรณีมีการเลือกไฟล์)
+                    const files = result.value.files;
+                    if (files.length > 0) {
+                        for (let i = 0; i < files.length; i++) {
+                            formData.append('files', files[i]); // ชื่อ 'files' ต้องตรงกับ Backend
                         }
                     }
 
-                    // แสดง Loading ระหว่างส่ง
+                    // แสดง Loading
                     Swal.fire({
-                        title: 'กำลังบันทึก...',
+                        title: 'กำลังส่งข้อมูล...',
                         allowOutsideClick: false,
                         didOpen: () => { Swal.showLoading(); }
                     });
 
-<<<<<<< HEAD
-                    // ส่ง POST ไปที่ /api/repair
+                    // ส่งข้อมูลไปยัง API
                     fetch(`http://${SERVER_IP}:5000/api/repair`, {
                         method: 'POST',
-                        body: formData
+                        body: formData // ส่งเป็น FormData (ห้ามตั้ง Headers เป็น JSON)
                     })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            Swal.fire('สำเร็จ!', `บันทึกการซ่อมเรียบร้อย (ID: ${data.id})`, 'success')
-                                .then(() => location.reload());
-                        } else {
-                            Swal.fire('ผิดพลาด', data.message || 'บันทึกล้มเหลว', 'error');
-                        }
-                    })
-                    .catch(err => {
-                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err.message, 'error');
-=======
-                    fetch(`http://${SERVER_IP}:5000/borrow`, {
-                        method: 'POST',
-                        body: formData // ส่งเป็น formData แทน JSON
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.message && !data.error) {
-                            Swal.fire('สำเร็จ!', 'บันทึกการซ่อมเรียบร้อย', 'success')
-                                .then(() => location.reload());
-                        } else {
-                            Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
-                        }
-                    })
-                    .catch(err => {
-                        Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
-                    });
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'สำเร็จ!',
+                                    text: 'บันทึกการแจ้งซ่อมเรียบร้อยแล้ว',
+                                    confirmButtonText: 'ตกลง'
+                                }).then(() => location.reload());
+                            } else {
+                                Swal.fire('ล้มเหลว', data.message || 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Fetch Error:", err);
+                            Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                        });
                 }
             });
         }
-<<<<<<< HEAD
+
+
 
         function returnItem(id) {
             // ดึงข้อมูลการยืมที่ยังไม่ได้คืน
@@ -455,18 +497,18 @@
                                     item_id: id
                                 })
                             })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.message) {
-                                    Swal.fire('สำเร็จ!', 'คืนอุปกรณ์เรียบร้อย', 'success')
-                                        .then(() => location.reload());
-                                } else {
-                                    Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
-                                }
-                            })
-                            .catch(err => {
-                                Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err.message, 'error');
-                            });
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.message) {
+                                        Swal.fire('สำเร็จ!', 'คืนอุปกรณ์เรียบร้อย', 'success')
+                                            .then(() => location.reload());
+                                    } else {
+                                        Swal.fire('ผิดพลาด', data.error || 'บันทึกล้มเหลว', 'error');
+                                    }
+                                })
+                                .catch(err => {
+                                    Swal.fire('ผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err.message, 'error');
+                                });
                         }
                     });
                 })
@@ -474,8 +516,7 @@
                     Swal.fire('ผิดพลาด', 'ไม่สามารถดึงข้อมูลการยืมได้: ' + err.message, 'error');
                 });
         }
-=======
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     </script>
 </body>
+
 </html>

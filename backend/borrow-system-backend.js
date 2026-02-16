@@ -9,7 +9,6 @@ const QRCode = require('qrcode'); // ต้อง npm install qrcode ก่อ�
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
-<<<<<<< HEAD
 
 
 const storage = multer.diskStorage({
@@ -17,7 +16,7 @@ const storage = multer.diskStorage({
         // ตรวจสอบ path เพื่อกำหนด folder ถูกต้อง
         let folder = 'uploads';
 
-        if (req.path === '/api/repair') {
+        if (req.path === '/repairs') {
             folder = 'uploads/repairs';
         } else if (req.path === '/borrow') {
             folder = 'uploads/borrowing';
@@ -30,10 +29,6 @@ const storage = multer.diskStorage({
 
         cb(null, folder);
     },
-=======
-const storage = multer.diskStorage({
-    destination: 'uploads', // ตรวจสอบว่ามีโฟลเดอร์นี้ในโปรเจกต์
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     filename: (req, file, cb) => {
         // เปลี่ยนชื่อไฟล์ป้องกันชื่อซ้ำ
         cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
@@ -43,14 +38,15 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
-app.use('/uploads', express.static('uploads'));
-app.use('/qrcodes', express.static(path.join(__dirname, 'generated_qrcodes')));
+app.use('/uploads/repairs', express.static(path.join(__dirname, 'uploads/repairs')));
+app.use('/uploads/borrowing', express.static(path.join(__dirname, 'uploads/borrowing')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(express.static(__dirname));
-// 1. เชื่อมต่อฐานข้อมูล (อ้างอิงตามโครงสร้าง 6 ตารางของคุณ)
+
 const db = mysql.createPool({
     host: 'localhost',
     user: 'root',      // ใส่ user ของคุณ
@@ -115,11 +111,7 @@ app.patch('/delete-item/:id', (req, res) => {
         // ลบ borrowing logs ที่อ้างอิงถึง item นี้ก่อน
         db.query("DELETE FROM borrowing_logs WHERE item_id = ?", [id], (logErr) => {
             if (logErr) return res.status(500).json({ error: "Cannot delete logs", details: logErr });
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // จากนั้นลบ item
             const sql = "DELETE FROM items WHERE item_id = ?";
             db.query(sql, [id], (updErr) => {
@@ -251,17 +243,10 @@ app.post('/borrow', upload.array('files', 5), (req, res) => {
                     // 4. Update สถานะ items
                     db.query("UPDATE items SET status = 'Borrowed' WHERE item_id = ?", [item_id], (upErr) => {
                         if (upErr) return res.status(500).json(upErr);
-<<<<<<< HEAD
                         res.json({
                             message: "ยืมสำเร็จและอัปโหลดไฟล์เรียบร้อย!",
                             employee_id: empId,
                             log_id: logId
-=======
-                        res.json({ 
-                            message: "ยืมสำเร็จและอัปโหลดไฟล์เรียบร้อย!", 
-                            employee_id: empId,
-                            log_id: logId 
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                         });
                     });
                 });
@@ -446,11 +431,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
     }
 
     const { item_name, cat_id, asset_number, serial_number, contract_number, status } = req.body;
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     if (!item_name) {
         return res.status(400).json({ error: "กรุณาระบุชื่ออุปกรณ์" });
     }
@@ -484,11 +465,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
         try {
             const SERVER_IP = "192.168.1.159"; // 🚩 เปลี่ยนเป็น IP เครื่องคอมคุณ
             const qrData = `http://${SERVER_IP}:5000/testqr.html?id=${newItemId}`;
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // สร้างโฟลเดอร์ถ้ายังไม่มี
             const qrFolder = path.join(__dirname, 'generated_qrcodes');
             if (!fs.existsSync(qrFolder)) {
@@ -502,11 +479,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
             await QRCode.toFile(qrPath, qrData);
 
             console.log("✅ เพิ่มข้อมูลและสร้าง QR สำเร็จ ID:", newItemId);
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
             // ส่งค่ากลับไปให้ Frontend
             res.json({
                 message: "เพิ่มอุปกรณ์และสร้าง QR Code เรียบร้อยแล้ว",
@@ -697,11 +670,7 @@ app.post('/admin/login', (req, res) => {
             const admin = results[0];
             // สร้าง token ง่ายๆ (ในการใช้งานจริงควรใช้ JWT)
             const token = Buffer.from(`${admin.admin_id}:${Date.now()}`).toString('base64');
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
             res.json({
                 message: "เข้าสู่ระบบสำเร็จ",
                 token: token,
@@ -715,238 +684,71 @@ app.post('/admin/login', (req, res) => {
 });
 
 
-<<<<<<< HEAD
 app.post('/api/repair', upload.array('files', 5), (req, res) => {
-    const {
-        brand,
-        contract_number,
-        serial_number,
-        asset_number,
-        affiliation,
-        problem,
-        item_id,
-        owner_name,
-        employee_code,
-        phone_number
+    const { 
+        brand, contract_number, serial_number, asset_number, 
+        affiliation, problem, item_id, 
+        employee_name, employees_code, phone_number 
     } = req.body;
 
-    console.log("📝 Repair Request:", { brand, item_id, problem, owner_name, employee_code });
-
     const uploadedFiles = req.files;
-
-    // 1. สร้างโฟลเดอร์ repairs ถ้ายังไม่มี
-    const repairFolder = path.join(__dirname, 'uploads', 'repairs');
-    if (!fs.existsSync(repairFolder)) {
-        fs.mkdirSync(repairFolder, { recursive: true });
-    }
-
-    // 2. สร้าง path ของไฟล์ที่อัปโหลด
+    // รวมชื่อไฟล์หลายๆ ไฟล์คั่นด้วยคอมมา
     const filePaths = uploadedFiles && uploadedFiles.length > 0
-        ? uploadedFiles.map(file => `/uploads/repairs/${file.filename}`).join(',')
+        ? uploadedFiles.map(file => file.filename).join(',')
         : null;
 
-    // 3. ดึง employee_id จาก borrowing_logs
-    if (item_id) {
-        const getEmployeeSql = `SELECT bl.employee_id FROM borrowing_logs bl WHERE bl.item_id = ? ORDER BY bl.borrow_date DESC LIMIT 1`;
-        console.log(`🔍 Searching for employee_id for item ${item_id}...`);
-        
-        db.query(getEmployeeSql, [item_id], (empErr, empResult) => {
-            let employeeId = null;
+    const saveRepairData = (empId, empName, empCode, empPhone) => {
+        const finalName = empName || employee_name || '-';
+        const finalCode = empCode || employees_code || '-';
+        const finalPhone = empPhone || phone_number || '-';
 
-            if (empErr) {
-                console.log(`❌ Query error: ${empErr.message}`);
-            } else if (empResult.length > 0) {
-                employeeId = empResult[0].employee_id;
-                console.log(`✅ Found employee_id: ${employeeId} for item ${item_id}`);
-            } else {
-                console.log(`⚠️ No borrowing history found for item ${item_id}`);
-            }
+        // ปรับชื่อตารางเป็น repairs (มี s) และชื่อคอลัมน์ให้ตรงตามที่คุณต้องการดึง
+        const sql = `INSERT INTO repair (
+            brand, contract_number, serial_number, asset_number, 
+            affiliation, problem, repair_url, employee_id, 
+            employee_name, employees_code, phone_number, item_id, 
+            status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`;
 
-            // 4. ดึงข้อมูลพนักงาน
-            let employeeName = null;
-            let employeeCode = null;
-            let phoneNumber = null;
-
-            if (employeeId) {
-                const getEmployeeDetailsSql = `SELECT CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS full_name, employees_code, phone_number FROM employees WHERE id = ?`;
-                db.query(getEmployeeDetailsSql, [employeeId], (empDetailErr, empDetailResult) => {
-                    if (!empDetailErr && empDetailResult.length > 0) {
-                        employeeName = empDetailResult[0].full_name;
-                        employeeCode = empDetailResult[0].employees_code;
-                        phoneNumber = empDetailResult[0].phone_number;
-                    }
-
-                    // 5. บันทึกข้อมูลลง repair table
-                    const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem, repair_url, employee_id, employee_name, employees_code, phone_number, item_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
-                    const values = [brand, contract_number, serial_number, asset_number, affiliation, problem, filePaths, employeeId, employeeName, employeeCode, phoneNumber, item_id];
-
-                    db.query(sql, values, (err, result) => {
-                        if (err) {
-                            console.error("❌ Database Error:", err);
-                            return res.status(500).json({
-                                success: false,
-                                message: "Database Error",
-                                details: err.message
-                            });
-                        }
-
-                        const repairId = result.insertId;
-                        console.log("✅ Repair recorded ID:", repairId);
-                        console.log(`📝 Employee data saved: ${employeeName} (${employeeCode}) ${phoneNumber}`);
-
-                        // 6. อัปเดตสถานะ item เป็น "Maintenance" - รอให้เสร็จบัญชีก่อน return
-                        if (item_id) {
-                            console.log(`🔄 Updating item ${item_id} to Maintenance status...`);
-                            const updateItemSql = "UPDATE items SET status = 'Maintenance' WHERE item_id = ?";
-                            db.query(updateItemSql, [item_id], (itemErr, itemResult) => {
-                                if (itemErr) {
-                                    console.error("❌ Update Item Error:", itemErr);
-                                } else {
-                                    console.log(`✅ Item ${item_id} status updated. Affected rows:`, itemResult.affectedRows);
-                                }
-                                
-                                // ส่งข้อมูลกลับหลังจากอัปเดตสถานะเสร็จ
-                                res.status(201).json({
-                                    success: true,
-                                    message: "บันทึกข้อมูลสำเร็จ!",
-                                    id: repairId,
-                                    files_uploaded: uploadedFiles ? uploadedFiles.length : 0,
-                                    file_paths: filePaths ? filePaths.split(',') : [],
-                                    item_id: item_id,
-                                    employee_id: employeeId,
-                                    employee_name: employeeName,
-                                    employees_code: employeeCode,
-                                    phone_number: phoneNumber,
-                                    timestamp: new Date().toISOString()
-                                });
-                            });
-                        } else {
-                            // ไม่มี item_id ส่งข้อมูลกลับเลย
-                            res.status(201).json({
-                                success: true,
-                                message: "บันทึกข้อมูลสำเร็จ!",
-                                id: repairId,
-                                files_uploaded: uploadedFiles ? uploadedFiles.length : 0,
-                                file_paths: filePaths ? filePaths.split(',') : [],
-                                item_id: null,
-                                employee_id: employeeId,
-                                employee_name: employeeName,
-                                employees_code: employeeCode,
-                                phone_number: phoneNumber,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    });
-                });
-            } else {
-                // ถ้าไม่มี employeeId ให้บันทึกเลยกับข้อมูลจากฟอร์ม
-                const finalEmployeeName = owner_name || '-';
-                const finalEmployeeCode = employee_code || '-';
-                const finalPhoneNumber = phone_number || '-';
-
-                const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem, repair_url, employee_id, employee_name, employees_code, phone_number, item_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW(), NOW())`;
-                const values = [brand, contract_number, serial_number, asset_number, affiliation, problem, filePaths, finalEmployeeName, finalEmployeeCode, finalPhoneNumber, item_id];
-
-                db.query(sql, values, (err, result) => {
-                    if (err) {
-                        console.error("❌ Database Error:", err);
-                        return res.status(500).json({
-                            success: false,
-                            message: "Database Error",
-                            details: err.message
-                        });
-                    }
-
-                    const repairId = result.insertId;
-                    console.log("✅ Repair recorded ID (no employee):", repairId);
-
-                    // อัปเดตสถานะ item เป็น "Maintenance" - รอให้เสร็จบัญชีก่อน return
-                    if (item_id) {
-                        const updateItemSql = "UPDATE items SET status = 'Maintenance' WHERE item_id = ?";
-                        db.query(updateItemSql, [item_id], (itemErr, itemResult) => {
-                            if (itemErr) {
-                                console.error("❌ Update Item Error:", itemErr);
-                            } else {
-                                console.log(`✅ Item ${item_id} status updated. Affected rows:`, itemResult.affectedRows);
-                            }
-
-                            // ส่งข้อมูลกลับหลังจากอัปเดตสถานะเสร็จ
-                            res.status(201).json({
-                                success: true,
-                                message: "บันทึกข้อมูลสำเร็จ!",
-                                id: repairId,
-                                files_uploaded: uploadedFiles ? uploadedFiles.length : 0,
-                                file_paths: filePaths ? filePaths.split(',') : [],
-                                item_id: item_id,
-                                employee_id: null,
-                                employee_name: finalEmployeeName,
-                                employees_code: finalEmployeeCode,
-                                phone_number: finalPhoneNumber,
-                                timestamp: new Date().toISOString()
-                            });
-                        });
-                    } else {
-                        // ไม่มี item_id ส่งข้อมูลกลับเลย
-                        res.status(201).json({
-                            success: true,
-                            message: "บันทึกข้อมูลสำเร็จ!",
-                            id: repairId,
-                            files_uploaded: uploadedFiles ? uploadedFiles.length : 0,
-                            file_paths: filePaths ? filePaths.split(',') : [],
-                            item_id: null,
-                            employee_id: null,
-                            employee_name: finalEmployeeName,
-                            employees_code: finalEmployeeCode,
-                            phone_number: finalPhoneNumber,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                });
-            }
-        });
-    } else {
-        // ถ้าไม่มี item_id ให้ insert เลยกับข้อมูลจากฟอร์ม
-        const finalEmployeeName = owner_name || '-';
-        const finalEmployeeCode = employee_code || '-';
-        const finalPhoneNumber = phone_number || '-';
-
-        const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem, repair_url, employee_name, employees_code, phone_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
-        const values = [brand, contract_number, serial_number, asset_number, affiliation, problem, filePaths, finalEmployeeName, finalEmployeeCode, finalPhoneNumber];
+        const values = [
+            brand, contract_number, serial_number, asset_number, 
+            affiliation, problem, filePaths, empId, 
+            finalName, finalCode, finalPhone, item_id
+        ];
 
         db.query(sql, values, (err, result) => {
             if (err) {
-                console.error("❌ Database Error:", err);
-                return res.status(500).json({
-                    success: false,
-                    message: "Database Error",
-                    details: err.message
-                });
+                console.error("❌ SQL Error:", err.message);
+                return res.status(500).json({ success: false, message: err.message });
             }
-
-            const repairId = result.insertId;
-            console.log("✅ Repair recorded ID (no item):", repairId);
-
-            const finalEmployeeName = owner_name || '-';
-            const finalEmployeeCode = employee_code || '-';
-            const finalPhoneNumber = phone_number || '-';
-
-            res.status(201).json({
-                success: true,
-                message: "บันทึกข้อมูลสำเร็จ!",
-                id: repairId,
-                files_uploaded: uploadedFiles ? uploadedFiles.length : 0,
-                file_paths: filePaths ? filePaths.split(',') : [],
-                item_id: null,
-                employee_id: null,
-                employee_name: finalEmployeeName,
-                employees_code: finalEmployeeCode,
-                phone_number: finalPhoneNumber,
-                timestamp: new Date().toISOString()
-            });
+            if (item_id) {
+                db.query("UPDATE items SET status = 'Maintenance' WHERE item_id = ?", [item_id]);
+            }
+            res.status(201).json({ success: true, message: "แจ้งซ่อมสำเร็จ" });
         });
+    };
+
+    // Logic ตรวจสอบประวัติยืมเดิม
+    if (item_id && item_id !== 'null') {
+        const getEmployeeSql = `
+            SELECT e.id, CONCAT(e.first_name, ' ', e.last_name) AS full_name, e.employees_code, e.phone_number 
+            FROM borrowing_logs bl 
+            JOIN employees e ON bl.employee_id = e.id 
+            WHERE bl.item_id = ? 
+            ORDER BY bl.borrow_date DESC LIMIT 1`;
+        
+        db.query(getEmployeeSql, [item_id], (empErr, empResult) => {
+            if (empErr || empResult.length === 0) {
+                saveRepairData(null, null, null, null);
+            } else {
+                const emp = empResult[0];
+                saveRepairData(emp.id, emp.full_name, emp.employees_code, emp.phone_number);
+            }
+        });
+    } else {
+        saveRepairData(null, null, null, null);
     }
 });
-
 /**
  * GET API: ดึงข้อมูลซ่อมแซมพร้อมฟิลเตอร์, ค้นหา และ pagination
  */
@@ -958,36 +760,30 @@ app.get('/api/repair', (req, res) => {
     const sortOrder = req.query.sortOrder === 'ASC' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    // 1. ค้นหาจาก brand, serial_number, asset_number, problem
+    // 1. ค้นหาให้ครอบคลุมถึงชื่อพนักงานและรหัสพนักงานที่บันทึกไว้ในตาราง repair
     const searchCondition = search
-        ? ` WHERE r.brand LIKE ? OR r.contract_number LIKE ? OR r.serial_number LIKE ? OR r.asset_number LIKE ? OR r.problem LIKE ? OR r.created_at LIKE ? OR r.updated_at LIKE ? OR r.affiliation LIKE ? `
+        ? ` WHERE r.brand LIKE ? OR r.contract_number LIKE ? OR r.serial_number LIKE ? 
+            OR r.asset_number LIKE ? OR r.problem LIKE ? OR r.employee_name LIKE ? 
+            OR r.employees_code LIKE ? OR r.affiliation LIKE ? `
         : '';
 
     const searchParams = search
         ? Array(8).fill(`%${search}%`)
         : [];
 
-    // 2. นับจำนวนทั้งหมด
-    const countSql = `
-        SELECT COUNT(*) as total 
-        FROM repair r
-        ${searchCondition}
-    `;
+    // 2. นับจำนวนรายการทั้งหมด
+    const countSql = `SELECT COUNT(*) as total FROM repair r ${searchCondition}`;
 
     db.query(countSql, searchParams, (err, countResult) => {
         if (err) {
             console.error("❌ Count Error:", err);
-            return res.status(500).json({
-                success: false,
-                message: "Error counting records",
-                error: err.message
-            });
+            return res.status(500).json({ success: false, message: "Error counting records" });
         }
 
         const totalRecords = countResult[0].total;
         const totalPages = Math.ceil(totalRecords / limit);
 
-        // 3. ดึงข้อมูลอย่างละเอียด พร้อมข้อมูลพนักงานจากหลายแหล่ง
+        // 3. ดึงข้อมูล (เน้นดึงค่าจากตาราง r เป็นหลัก เพื่อให้ข้อมูลที่พิมพ์มาตอนส่งซ่อมแสดงผลได้)
         const sql = `
             SELECT 
                 r.repair_id,
@@ -1000,17 +796,15 @@ app.get('/api/repair', (req, res) => {
                 r.repair_url,
                 r.created_at,
                 r.updated_at,
-                CASE 
-                    WHEN TRIM(COALESCE(r.employee_name, '')) != '' THEN TRIM(r.employee_name)
-                    WHEN TRIM(CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, ''))) != '' THEN TRIM(CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, '')))
-                    ELSE '-'
-                END AS employee_name,
-                COALESCE(r.employees_code, e.employees_code, '-') AS employees_code,
-                COALESCE(r.phone_number, e.phone_number, '-') AS phone_number
+                r.item_id,
+                -- ถ้าในตาราง repair มีชื่อพนักงาน ให้ใช้ชื่อนั้น ถ้าไม่มีค่อยดึงจาก JOIN (Fallback)
+                COALESCE(r.employee_name, CONCAT(e.first_name, ' ', e.last_name)) AS employee_name,
+                COALESCE(r.employees_code, e.employees_code) AS employees_code,
+                COALESCE(r.phone_number, e.phone_number) AS phone_number
             FROM repair r
             LEFT JOIN employees e ON r.employee_id = e.id
             ${searchCondition}
-            ORDER BY ${sortBy} ${sortOrder}
+            ORDER BY ${sortBy === 'repair_id' ? 'r.repair_id' : sortBy} ${sortOrder}
             LIMIT ? OFFSET ?
         `;
 
@@ -1019,14 +813,10 @@ app.get('/api/repair', (req, res) => {
         db.query(sql, params, (err, results) => {
             if (err) {
                 console.error("❌ Select Error:", err);
-                return res.status(500).json({
-                    success: false,
-                    message: "Error fetching repairs",
-                    error: err.message
-                });
+                return res.status(500).json({ success: false, message: "Error fetching repairs" });
             }
 
-            // 4. ผ่าน path ไฟล์แยกออกมาเป็น Array
+            // 4. จัดการข้อมูล Path รูปภาพ
             const formattedResults = results.map(row => ({
                 ...row,
                 file_paths: row.repair_url ? row.repair_url.split(',') : []
@@ -1050,45 +840,74 @@ app.get('/api/repair', (req, res) => {
                 }
             });
         });
-=======
-app.post('/api/repair', (req, res) => {
-    const { 
-        brand, 
-        contract_number, 
-        serial_number, 
-        asset_number, 
-        affiliation, 
-        problem 
-    } = req.body;
+    });
+});
 
-    const sql = `INSERT INTO repair (brand, contract_number, serial_number, asset_number, affiliation, problem) 
-                 VALUES (?, ?, ?, ?, ?, ?)`;
+app.get('/api/repair-management', (req, res) => {
+    // ดึงเฉพาะข้อมูลตัวอักษรที่เราต้องการแสดงผล
+    const sql = `
+        SELECT 
+            repair_id, 
+            employee_name, 
+            employee_id, 
+            phone_number, 
+            affiliation,
+            brand, 
+            serial_number, 
+            asset_number, 
+            problem, 
+            status, 
+            created_at, 
+            finished_at,
+            repair_url
+        FROM repair 
+        WHERE status != 'Fixed'
+        ORDER BY created_at DESC
+    `;
 
-    const values = [brand, contract_number, serial_number, asset_number, affiliation, problem];
-
-    db.query(sql, values, (err, result) => {
+    db.query(sql, (err, results) => {
         if (err) {
-            console.error(err);
-            return res.status(500).json({ success: false, message: "Database Error" });
+            console.error("❌ SQL Error:", err.message);
+            return res.status(500).json({ success: false, error: err.message });
         }
-        res.status(201).json({ 
-            success: true, 
-            message: "บันทึกข้อมูลสำเร็จ!", 
-            id: result.insertId 
-        });
+        res.json({ success: true, data: results });
     });
 });
 
-/**
- * 3. GET API: ดึงข้อมูลทั้งหมดออกมาดู (เผื่อเอาไปทำตาราง Dashboard)
- */
-app.get('/api/repair', (req, res) => {
-    db.query('SELECT * FROM repair', (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
+// อัปเดตสถานะการซ่อมแซม
+// API สำหรับดึงข้อมูลสถานะการซ่อมปัจจุบัน (ใช้กับหน้า status_repair.html และ Dashboard)
+// ในไฟล์ borrow-system-backend.js
+app.get('/api/repair-status', (req, res) => {
+    const sql = `
+        SELECT 
+            repair_id, 
+            item_id, 
+            brand, 
+            asset_number, 
+            serial_number, 
+            employee_name, 
+            employees_code AS employee_id, -- แมพชื่อให้ตรงกับหน้าบ้าน
+            phone_number AS phone,         -- แมพชื่อให้ตรงกับหน้าบ้าน
+            affiliation AS department,     -- แมพชื่อให้ตรงกับหน้าบ้าน
+            problem, 
+            status, 
+            created_at, 
+            finished_at, 
+            repair_url
+        FROM repair
+        WHERE status IN ('Pending', 'In Progress')
+        ORDER BY created_at DESC
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("❌ SQL Error:", err.message);
+            return res.status(500).json({ success: false, message: err.message });
+        }
+        res.json({ success: true, data: results });
     });
 });
+
 
 const PORT = 5000;
 console.log('Server is running on port 5000');

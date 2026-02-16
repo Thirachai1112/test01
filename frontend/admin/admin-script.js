@@ -6,15 +6,12 @@ let currentLogsPage = 1;
 const logsPerPage = 10;
 let allBorrowingLogs = []; // เก็บข้อมูลทั้งหมด
 let filteredLogs = []; // เก็บผลลัพธ์ค้นหา logs
-<<<<<<< HEAD
 
 // Repair Logs
 let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
-=======
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
 const SERVER_IP = "192.168.1.159";
 
 // ฟังก์ชันค้นหาอุปกรณ์
@@ -35,11 +32,7 @@ function displayInventory(data) {
                 ? `http://localhost:5000/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
-<<<<<<< HEAD
             //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
-=======
-                //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
             const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
 
             listElement.innerHTML += `
@@ -86,11 +79,7 @@ function displayInventory(data) {
 function showQR(qrUrl, itemName) {
     const qrImage = document.getElementById('qrDisplayImage');
     const downloadBtn = document.getElementById('qrDownloadBtn');
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     qrImage.src = qrUrl;
     downloadBtn.href = qrUrl;
     downloadBtn.download = `QR_${itemName}.png`;
@@ -103,11 +92,7 @@ function showQR(qrUrl, itemName) {
 function searchBorrowingLogs() {
     const searchTerm = document.getElementById('logs-search').value.toLowerCase();
     currentLogsPage = 1;
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     if (searchTerm === '') {
         filteredLogs = allBorrowingLogs;
     } else {
@@ -117,11 +102,7 @@ function searchBorrowingLogs() {
             (log.Affiliation && log.Affiliation.toLowerCase().includes(searchTerm))
         );
     }
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
     displayBorrowingLogs(filteredLogs, currentLogsPage);
 }
 
@@ -133,11 +114,7 @@ async function loadBorrowingLogs(page = 1) {
         const data = await response.json();
         allBorrowingLogs = data.logs || [];
         filteredLogs = allBorrowingLogs;
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
         displayBorrowingLogs(filteredLogs, page);
     } catch (error) {
         console.error('Error loading borrowing logs:', error);
@@ -156,11 +133,7 @@ function displayBorrowingLogs(logs, page) {
     if (pageItems.length > 0) {
         pageItems.forEach((log, index) => {
             const borrowDate = new Date(log.borrow_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-<<<<<<< HEAD
             const returnDate = log.return_date
-=======
-            const returnDate = log.return_date 
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 ? new Date(log.return_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
                 : '-';
             const status = log.return_date ? 'คืนแล้ว' : 'ยืมอยู่';
@@ -175,11 +148,7 @@ function displayBorrowingLogs(logs, page) {
                 log.file_paths.forEach(path => {
                     const fileUrl = `http://localhost:5000${path}`; // ตรวจสอบ Port ให้ตรงกับ Backend
                     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(path);
-<<<<<<< HEAD
 
-=======
-                    
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                     if (isImage) {
                         filesHtml += `
                             <a href="${fileUrl}" target="_blank" title="คลิกเพื่อดูรูปใหญ่">
@@ -245,7 +214,6 @@ function renderLogsPagination(totalPages, currentPage) {
 // ฟังก์ชันอัปเดตสรุปข้อมูล (เรียกเมื่อเพิ่ม/ลบ)
 async function updateDashboardStats() {
     try {
-        // ดึงข้อมูลทั้งหมด (limit 999 แค่สำหรับนับข้อมูล)
         const response = await fetch(`http://localhost:5000/items?page=1&limit=999`);
         const data = await response.json();
         const allItems = data.items || [];
@@ -253,16 +221,23 @@ async function updateDashboardStats() {
         const totalItems = allItems.length;
         const availableCount = allItems.filter(i => i.status === 'Available').length;
         const borrowedCount = allItems.filter(i => i.status === 'Borrowed').length;
+        const repairCount = allItems.filter(i => i.status === 'Maintenance').length;
 
-        document.getElementById('total-items').innerText = totalItems;
-        document.getElementById('total-available').innerText = availableCount;
-        document.getElementById('total-borrowed').innerText = borrowedCount;
-<<<<<<< HEAD
-        document.getElementById('total-repair').innerText = totalItems - availableCount - borrowedCount;
-=======
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
-    } catch (err) {
-        console.error("Dashboard Error:", err);
+        // ฟังก์ชันช่วยเช็ค ID ก่อนอัปเดตค่า
+        const updateIfExist = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value;
+        };
+
+        updateIfExist('total-items', totalItems);
+        updateIfExist('total-available', availableCount);
+        updateIfExist('total-borrowed', borrowedCount);
+        updateIfExist('total-repair', repairCount);
+        // สำหรับหน้าจอซ่อมที่คุณใช้อยู่
+        updateIfExist('repair-count', repairCount);
+
+    } catch (error) {
+        console.error("Dashboard Error:", error);
     }
 }
 
@@ -291,14 +266,10 @@ async function loadInventory(page = 1, search = '') {
 
         // อัปเดตเฉพาะ total items จาก pagination
         if (data.pagination) {
-<<<<<<< HEAD
             const totalElement = document.getElementById('total-items');
             if (totalElement) { // ต้องเช็คเสมอว่ามี ID นี้ไหม
                 totalElement.innerText = data.pagination.totalItems || 0;
             }
-=======
-            document.getElementById('total-items').innerText = data.pagination.totalItems || 0;
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
         }
 
         displayInventory(data);
@@ -348,15 +319,9 @@ async function deleteItem(id) {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
-<<<<<<< HEAD
 
             const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
                 method: 'PATCH',
-=======
-            
-            const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
-                method: 'PATCH', 
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
@@ -387,7 +352,6 @@ function renderPagination(pagination) {
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage - 1})">ก่อนหน้า</a>
              </li>`;
 
-<<<<<<< HEAD
     const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
 
     for (let i = 1; i <= totalPages; i++) {
@@ -403,23 +367,6 @@ function renderPagination(pagination) {
             html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
         }
     }
-=======
-  const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
-
-for (let i = 1; i <= totalPages; i++) {
-    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
-    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
-        
-        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
-                 </li>`;
-                 
-    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
-        // แสดง "..." เพื่อย่อเลขหน้า
-        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-    }
-}
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
 
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                 <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${currentPage + 1})">ถัดไป</a>
@@ -529,15 +476,9 @@ function editItem(id) {
         if (qrPreviewImg) {
             // ดึงรูปจากโฟลเดอร์ qrcodes ของ Server
             qrPreviewImg.src = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
-<<<<<<< HEAD
 
             // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
             qrPreviewImg.onerror = function () {
-=======
-            
-            // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
-            qrPreviewImg.onerror = function() {
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
                 this.src = "https://via.placeholder.com/100?text=No+QR";
             };
         }
@@ -660,7 +601,6 @@ function renderPagination(pagination) {
     // ปุ่มเลขหน้า
     const range = 3; // จำนวนหน้าที่จะแสดงก่อนและหลังหน้าปัจจุบัน
 
-<<<<<<< HEAD
     for (let i = 1; i <= totalPages; i++) {
         // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
         if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
@@ -674,21 +614,6 @@ function renderPagination(pagination) {
             html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
         }
     }
-=======
-for (let i = 1; i <= totalPages; i++) {
-    // เงื่อนไข: แสดงหน้าแรก, หน้าสุดท้าย, และหน้ารอบๆ หน้าปัจจุบัน
-    if (i === 1 || i === totalPages || (i >= currentPage - range && i <= currentPage + range)) {
-        
-        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="javascript:void(0)" onclick="loadInventory(${i})">${i}</a>
-                 </li>`;
-                 
-    } else if (i === currentPage - range - 1 || i === currentPage + range + 1) {
-        // แสดง "..." เพื่อย่อเลขหน้า
-        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-    }
-}
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
 
     // ปุ่ม Next
     html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
@@ -720,26 +645,32 @@ function logout() {
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-        // ไม่มี token ให้ไปหน้า login
         window.location.href = 'login.html';
         return;
     }
 
-    // โหลดข้อมูล Admin username (ถ้าเก็บไว้)
     const adminUser = localStorage.getItem('adminUser');
-    if (adminUser) {
-        // หากต้องการให้แสดง username ต้องดึงจาก localStorage หรือ API
-        // ตอนนี้แสดงเป็น "Admin" ก่อน
-        document.getElementById('usernameDisplay').textContent = 'Admin ' + adminUser;
+    const userDisplay = document.getElementById('usernameDisplay');
+
+    // ✅ ตรวจสอบก่อนว่ามี element นี้ในหน้านี้ไหม
+    if (userDisplay && adminUser) {
+        userDisplay.textContent = 'Admin ' + adminUser;
     }
 
-    await loadInventory(); // โหลดตารางรายการก่อน
-<<<<<<< HEAD
+    // ✅ ตรวจสอบว่าอยู่หน้า Inventory หรือไม่
+    if (document.getElementById('inventory-list')) {
+        await loadInventory();
+    }
+
+    // ✅ ตรวจสอบว่าอยู่หน้า Dashboard (ที่มีสรุปยอด) หรือไม่
     if (document.getElementById('total-items')) {
         updateDashboardStats();
     }
 
-
+    // ✅ ตรวจสอบว่าอยู่หน้า status_repair.html หรือไม่
+    if (document.getElementById('repair-list')) {
+        await loadRepairData(); // เรียกฟังก์ชันโหลดข้อมูลซ่อม
+    }
 });
 
 // ===================== REPAIR LOGS FUNCTIONS =====================
@@ -791,12 +722,33 @@ function displayRepairLogs(repairs) {
 
         // 3. จัดการไฟล์แนบ
         let fileHtml = '<small class="text-muted">ไม่มี</small>';
-        if (repair.file_paths && repair.file_paths.length > 0) {
-            fileHtml = repair.file_paths.map(path => {
-                const filename = path.split('/').pop();
-                return `<a href="http://localhost:5000/${path}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 me-1" title="${filename}">
-                            <i class="fas fa-image"></i>
-                        </a>`;
+
+        // เปลี่ยนจาก file_paths เป็น repair_url ตามชื่อใน DB
+        if (repair.repair_url) {
+            // แยกชื่อไฟล์ด้วยคอมมา (,) เผื่อกรณีมีหลายไฟล์
+            const files = repair.repair_url.split(',');
+
+            fileHtml = files.map(filename => {
+                let cleanName = filename.trim();
+                if (!cleanName) return '';
+
+                // 1. กำจัดสแลชที่อาจติดมาข้างหน้าชื่อไฟล์ (เพื่อป้องกันปัญหา // สแลชซ้ำ)
+                cleanName = cleanName.replace(/^\/+/, '');
+
+                // 2. ตรวจสอบชื่อไฟล์: 
+                // ถ้าใน DB บันทึกว่า "uploads/repairs/ชื่อไฟล์.jpg" อยู่แล้ว -> ใช้ได้เลย
+                // ถ้าใน DB บันทึกแค่ "ชื่อไฟล์.jpg" -> ต้องเติม /uploads/repairs/ เข้าไป
+                let finalPath = cleanName.includes('uploads/')
+                    ? cleanName
+                    : `uploads/repairs/${cleanName}`;
+
+                // 3. สร้าง URL เต็ม โดยใช้ SERVER_IP แทน localhost (เพื่อให้มือถือหรือเครื่องอื่นเปิดได้ด้วย)
+                // และลบสแลชซ้ำซ้อนด้วย Regex อีกชั้นเพื่อความชัวร์
+                let fullUrl = `http://${SERVER_IP}:5000/${finalPath}`.replace(/([^:]\/)\/+/g, "$1");
+
+                return `<a href="${fullUrl}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 me-1">
+                <i class="fas fa-image"></i>
+            </a>`;
             }).join('');
         }
 
@@ -818,6 +770,41 @@ function displayRepairLogs(repairs) {
             </tr>
         `;
     });
+}
+
+async function updateRepairStatusCount() {
+    try {
+        const res = await fetch(`http://localhost:5000/api/repair-status`);
+        const result = await res.json();
+
+        const countElement = document.getElementById('total-repair-status');
+        if (countElement && result.success) {
+            // แสดงจำนวนรายการที่ค้างซ่อมทั้งหมด
+            countElement.innerText = result.data.length;
+        }
+    } catch (error) {
+        console.error("Error updating dashboard count:", error);
+    }
+}
+
+// เรียกใช้ฟังก์ชันนี้ในตอนโหลดหน้า Dashboard
+document.addEventListener('DOMContentLoaded', function () {
+    updateRepairStatusCount();
+});
+
+// ฟังก์ชันดึงยอดรวมงานค้างซ่อมไปโชว์ที่ Dashboard
+async function syncRepairDashboard() {
+    try {
+        const res = await fetch(`http://localhost:5000/api/repair-management`);
+        const result = await res.json();
+        const countEl = document.getElementById('total-repair-status');
+
+        if (countEl && result.success) {
+            countEl.innerText = result.data.length; // แสดงจำนวนงานที่ Pending + In Progress
+        }
+    } catch (error) {
+        console.error("Sync Dashboard Error:", error);
+    }
 }
 
 function displayRepairPagination(pagination) {
@@ -844,7 +831,3 @@ function displayRepairPagination(pagination) {
 function searchRepairLogs() {
     loadRepairLogs(1);
 }
-=======
-    updateDashboardStats(); // เสร็จแล้วค่อยอัปเดตสรุป
-});
->>>>>>> 442d9451970f7af6897cb31123546de110af8576
