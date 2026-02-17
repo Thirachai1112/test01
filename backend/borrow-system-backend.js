@@ -40,6 +40,7 @@ const upload = multer({ storage: storage });
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
 app.use('/uploads/repairs', express.static(path.join(__dirname, 'uploads/repairs')));
 app.use('/uploads/borrowing', express.static(path.join(__dirname, 'uploads/borrowing')));
+app.use('/qrcodes', express.static(path.join(__dirname, 'generated_qrcodes')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(cors());
 app.use(express.json());

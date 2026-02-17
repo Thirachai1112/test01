@@ -11,7 +11,9 @@
             padding: 0;
             font-family: 'Kanit', sans-serif;
             /* ส่วนการตั้งค่ารูปพื้นหลัง */
-            background-image: url('1112.gif'); /* <-- เปลี่ยนชื่อไฟล์รูปภาพของคุณตรงนี้ */
+            background-image: url('1041uuu-04.gif'); /* <-- เปลี่ยนชื่อไฟล์รูปภาพของคุณตรงนี้ */
+            background-size: cover; /* ทำให้รูปภาพครอบคลุมทั้งหน้าจอ */
+            background-position: center; /* จัดตำแหน่งรูปภาพให้อยู่ตรงกลาง */
             
             
             height: 100vh;
@@ -23,7 +25,7 @@
         /* เอฟเฟกต์กระจกฝ้า (Glassmorphism) เพื่อให้ข้อความอ่านง่ายบนรูปภาพ */
         .portal-container {
             text-align: center;
-            background: rgba(179, 205, 235, 0.8); /* สีขาวโปร่งแสง */
+            background: rgba(150, 156, 211, 0.8); /* สีขาวโปร่งแสง */
             padding: 50px;
             border-radius: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -65,8 +67,9 @@
         }
 
         /* สีพาสเทลตามสไตล์ที่คุณชอบ */
-        .btn-admin { background-color: #f1a58d; } /* ส้มชมพูพาสเทล */
-        .btn-employee { background-color: #84b59f; } /* เขียวพาสเทล */
+        .btn-admin { background-color: #5ebedb; }  
+        .btn-categories { background-color: #c0dd8d; } 
+        .btn-repair { background-color: #EA7B7B; } 
 
         .btn-portal:hover {
             transform: scale(1.05);
@@ -81,13 +84,16 @@
         <div class="subtitle">(Device Borrowing System)</div>
 
         <div class="button-group">
-            <a href="http://127.0.0.1:5500/frontend/User/repair-detail.html" class="btn-portal btn-employee">
-                👷 พนักงาน (Employee)
+            <a href="#" class="btn-portal btn-categories">
+                รายการอุปกรณ์ (Categories)
             </a>
-
+            <a href="#" class="btn-portal btn-repair">
+                🛠️ แจ้งซ่อมอุปกรณ์ (Repair Request)
+            </a>
             <a href="login.html" class="btn-portal btn-admin">
                 👤 ผู้ดูแลระบบ (Admin)
             </a>
+             
             
             
         </div>

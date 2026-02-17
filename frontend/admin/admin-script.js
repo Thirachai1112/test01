@@ -668,7 +668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ✅ ตรวจสอบว่าอยู่หน้า status_repair.html หรือไม่
-    if (document.getElementById('repair-list')) {
+    if (document.getElementById('     ')) {
         await loadRepairData(); // เรียกฟังก์ชันโหลดข้อมูลซ่อม
     }
 });
