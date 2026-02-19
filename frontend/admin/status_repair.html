@@ -7,7 +7,9 @@
     <title>Repair Tracking | Modern Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&family=Sarabun:wght@400;600&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --primary-color: #4361ee;
@@ -62,12 +64,12 @@
         .table tbody tr {
             background: white;
             transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
         }
 
         .table tbody tr:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
             background: #fff;
         }
 
@@ -77,8 +79,13 @@
             vertical-align: middle;
         }
 
-        .table td:first-child { border-radius: 12px 0 0 12px; }
-        .table td:last-child { border-radius: 0 12px 12px 0; }
+        .table td:first-child {
+            border-radius: 12px 0 0 12px;
+        }
+
+        .table td:last-child {
+            border-radius: 0 12px 12px 0;
+        }
 
         /* Status Badges */
         .status-pill {
@@ -91,9 +98,27 @@
             gap: 6px;
         }
 
-        .status-pending { background: #fff1f2; color: var(--pending-color); }
-        .status-progress { background: #fff8eb; color: var(--progress-color); }
-        .status-fixed { background: #e6fcf5; color: var(--fixed-color); }
+        .status-pill.status-fixed {
+            background: #e6fcf5;
+            color: #0c85d0;
+            /* หรือสีเขียว #06d6a0 */
+            border: 1px solid #06d6a0;
+        }
+
+        .status-pending {
+            background: #fff1f2;
+            color: var(--pending-color);
+        }
+
+        .status-progress {
+            background: #fff8eb;
+            color: var(--progress-color);
+        }
+
+        .status-fixed {
+            background: #e6fcf5;
+            color: var(--fixed-color);
+        }
 
         /* Icon Buttons */
         .btn-action {
@@ -107,11 +132,27 @@
             border: none;
         }
 
-        .btn-view { background: #edf2ff; color: var(--primary-color); }
-        .btn-view:hover { background: var(--primary-color); color: white; }
+        .btn-view {
+            background: #edf2ff;
+            color: var(--primary-color);
+        }
 
-        .btn-update { background: #f8f9fa; color: #333; font-size: 0.8rem; padding: 5px 15px; width: auto; }
-        .btn-update:hover { background: #e9ecef; }
+        .btn-view:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-update {
+            background: #f8f9fa;
+            color: #333;
+            font-size: 0.8rem;
+            padding: 5px 15px;
+            width: auto;
+        }
+
+        .btn-update:hover {
+            background: #e9ecef;
+        }
 
         code.sn-code {
             background: #f1f3f5;
@@ -158,7 +199,7 @@
                     </tr>
                 </thead>
                 <tbody id="repair-table-body">
-                    </tbody>
+                </tbody>
             </table>
         </div>
     </div>
@@ -179,49 +220,58 @@
             const body = document.getElementById('repair-table-body');
             body.innerHTML = '';
 
-            repairs.forEach(repair => {
+            // ใส่ (repair, index) เพื่อดึงลำดับมาใช้
+            repairs.forEach((repair, index) => {
                 const date = new Date(repair.created_at).toLocaleDateString('th-TH', {
                     day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
                 });
 
-                // File Handling Logic
+                // จัดการเรื่องรูปภาพหลักฐาน
                 let fileHtml = '-';
                 if (repair.repair_url) {
                     const files = repair.repair_url.split(',');
                     fileHtml = files.map(filename => {
-                        let cleanName = filename.trim().replace(/^\/+/, '');
-                        if (!cleanName) return '';
-                        let finalPath = cleanName.includes('uploads/') ? cleanName : `uploads/repairs/${cleanName}`;
-                        let fullUrl = `${API_BASE}/${finalPath}`.replace(/([^:]\/)\/+/g, "$1");
-                        return `<a href="${fullUrl}" target="_blank" class="btn-action btn-view me-1"><i class="fas fa-file-invoice"></i></a>`;
+                        const cleanName = filename.trim();
+                        const fullUrl = `${API_BASE}/uploads/repairs/${cleanName}`;
+                        const isPDF = cleanName.toLowerCase().endsWith('.pdf');
+
+                        // ถ้าเป็น PDF ให้ใช้ไอคอนไฟล์เอกสาร ถ้าเป็นรูปให้ใช้ไอคอนรูปภาพ
+                        const icon = isPDF ? 'fas fa-file-pdf text-danger' : 'fas fa-image text-primary';
+
+                        // สำคัญ: ห้ามใส่ attribute 'download' เพื่อให้มันเปิดใน tab ใหม่
+                        return `<a href="${fullUrl}" target="_blank" class="btn-action btn-view me-1" title="เปิดดูไฟล์">
+                <i class="${icon}"></i>
+            </a>`;
                     }).join('');
                 }
 
-                const statusClass = repair.status === 'Pending' ? 'status-pending' : (repair.status === 'In Progress' ? 'status-progress' : 'status-fixed');
-                const statusText = repair.status === 'Pending' ? '<i class="fas fa-clock"></i> รอรับเรื่อง' : (repair.status === 'In Progress' ? '<i class="fas fa-tools"></i> กำลังซ่อม' : '<i class="fas fa-check-circle"></i> เสร็จสิ้น');
+                const statusClass = repair.status === 'Pending' ? 'status-pending' : 'status-progress';
+                const statusText = repair.status === 'Pending' ? '<i class="fas fa-clock"></i> รอรับเรื่อง' : '<i class="fas fa-tools"></i> กำลังซ่อม';
 
                 body.innerHTML += `
-                    <tr>
-                        <td><span class="text-muted small">#${repair.repair_id}</span></td>
-                        <td>
-                            <div class="fw-bold">${repair.employee_name || 'ไม่ระบุ'}</div>
-                            <div class="text-muted small">${repair.department || '-'}</div>
-                        </td>
-                        <td><div class="fw-medium text-dark">${repair.brand || '-'}</div></td>
-                        <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
-                        <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
-                        <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
-                        <td><small class="text-muted">${date}</small></td>
-                        <td><span class="status-pill ${statusClass}">${statusText}</span></td>
-                        <td>${fileHtml}</td>
-                        <td class="text-center">
-                            ${repair.status === 'Pending' 
-                                ? `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`
-                                : `<button class="btn btn-update shadow-sm text-success" onclick="finishRepair(${repair.repair_id}, ${repair.item_id})">ปิดงาน</button>`
-                            }
-                        </td>
-                    </tr>
-                `;
+            <tr>
+                <td><span class="text-muted fw-bold">${index + 1}</span></td>
+                <td>
+                    <div class="fw-bold">${repair.employee_name || 'ไม่ระบุ'}</div>
+                    <div class="text-muted small">${repair.department || '-'}</div>
+                </td>
+                <td><div class="fw-medium text-dark">${repair.brand || '-'}</div></td>
+                <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
+                <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
+                <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
+                <td><small class="text-muted">${date}</small></td>
+                <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+                <td>${fileHtml}</td>
+                <td class="text-center">
+    ${repair.status === 'Pending'
+                        ? `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`
+                        : repair.status === 'In Progress'
+                            ? `<button class="btn btn-update shadow-sm text-success" onclick="finishRepair(${repair.repair_id}, ${repair.item_id})">ปิดงาน</button>`
+                            : `<span class="badge bg-light text-success"><i class="fas fa-check-circle"></i> เสร็จสิ้นแล้ว</span>`
+                    }
+</td>
+            </tr>
+        `;
             });
         }
 
@@ -247,7 +297,7 @@
                 const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Fixed', item_id: itemId })
+                    body: JSON.stringify({ status: 'Fixed' })
                 });
                 if (res.ok) {
                     Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
@@ -259,4 +309,5 @@
         document.addEventListener('DOMContentLoaded', loadRepairData);
     </script>
 </body>
+
 </html>

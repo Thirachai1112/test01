@@ -13,16 +13,16 @@ require('dotenv').config(); // อย่าลืมสร้างไฟล์ 
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // ตรวจสอบ path เพื่อกำหนด folder ถูกต้อง
-        let folder = 'uploads';
+        let folder = 'uploads'; // โฟลเดอร์เริ่มต้น
 
-        if (req.path === '/repairs') {
+        // ใช้ req.originalUrl เพื่อดู URL เต็มที่เรียกเข้ามา
+        if (req.originalUrl.includes('repair')) {
             folder = 'uploads/repairs';
-        } else if (req.path === '/borrow') {
+        } else if (req.originalUrl.includes('borrow')) {
             folder = 'uploads/borrowing';
         }
 
-        // สร้าง folder ถ้ายังไม่มี
+        // ตรวจสอบและสร้างโฟลเดอร์อัตโนมัติ
         if (!fs.existsSync(folder)) {
             fs.mkdirSync(folder, { recursive: true });
         }
@@ -30,7 +30,7 @@ const storage = multer.diskStorage({
         cb(null, folder);
     },
     filename: (req, file, cb) => {
-        // เปลี่ยนชื่อไฟล์ป้องกันชื่อซ้ำ
+        // ใช้ UUID ป้องกันชื่อซ้ำ (อันนี้ดีอยู่แล้วครับ)
         cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
     }
 });
@@ -886,16 +886,17 @@ app.get('/api/repair-status', (req, res) => {
             brand, 
             asset_number, 
             serial_number, 
+            contract_number,
             employee_name, 
-            employees_code AS employee_id, -- แมพชื่อให้ตรงกับหน้าบ้าน
-            phone_number AS phone,         -- แมพชื่อให้ตรงกับหน้าบ้าน
-            affiliation AS department,     -- แมพชื่อให้ตรงกับหน้าบ้าน
+            employees_code AS employee_id,
+            phone_number AS phone,
+            affiliation AS department,
             problem, 
             status, 
             created_at, 
-            finished_at, 
             repair_url
         FROM repair
+        -- แก้ไขตรงนี้: ดึงเฉพาะ 'รอรับเรื่อง' และ 'กำลังซ่อม' เท่านั้น
         WHERE status IN ('Pending', 'In Progress')
         ORDER BY created_at DESC
     `;
@@ -906,6 +907,34 @@ app.get('/api/repair-status', (req, res) => {
             return res.status(500).json({ success: false, message: err.message });
         }
         res.json({ success: true, data: results });
+    });
+});
+
+
+// API สำหรับอัปเดตสถานะการซ่อม (รองรับการกดปุ่ม รับงาน และ ปิดงาน)
+app.put('/api/repair/status/:id', (req, res) => {
+    const repairId = req.params.id;
+    const { status, item_id } = req.body;
+
+    let sql = "UPDATE repair SET status = ?, updated_at = NOW()";
+    let params = [status];
+
+    if (status === 'Fixed') {
+        sql += ", finished_at = NOW()";
+    }
+    
+    sql += " WHERE repair_id = ?";
+    params.push(repairId);
+
+    db.query(sql, params, (err, result) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+
+        // ถ้าซ่อมเสร็จ ให้ปลดล็อกอุปกรณ์ในตาราง items ให้พร้อมใช้งาน (Available)
+        if (status === 'Fixed' && item_id) {
+            db.query("UPDATE items SET status = 'Available' WHERE item_id = ?", [item_id]);
+        }
+
+        res.json({ success: true });
     });
 });
 

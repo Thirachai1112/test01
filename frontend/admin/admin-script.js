@@ -828,6 +828,112 @@ function displayRepairPagination(pagination) {
     paginationElement.innerHTML = html;
 }
 
+
+async function loadRecentBorrows() {
+    try {
+        // ใช้ Endpoint เดียวกับหน้าประวัติการยืมที่คุณมี
+        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const data = await response.json();
+        const logs = data.logs || [];
+        
+        // กรองเอาเฉพาะรายการที่ "กำลังยืมอยู่" และหยิบมาแค่ 5 รายการล่าสุด
+        const recentBorrows = logs
+            .filter(log => !log.return_date) // เฉพาะที่ยังไม่คืน
+            .slice(0, 5);
+
+        const listElement = document.getElementById('dashboard-borrow-list');
+        if (!listElement) return;
+
+        let html = '';
+        if (recentBorrows.length > 0) {
+            recentBorrows.forEach(log => {
+                const borrowDate = new Date(log.borrow_date).toLocaleDateString('th-TH');
+                html += `
+                <tr>
+                    <td class="ps-4"><strong>${log.employee_name}</strong></td>
+                    <td>${log.item_name}</td>
+                    <td><span class="badge bg-info text-white font-monospace">${log.serial_number || '-'}</span></td>
+                    <td><small>${log.purpose || '-'}</small></td>
+                    <td><span class="badge bg-warning text-dark">กำลังยืม</span></td>
+                </tr>`;
+            });
+        } else {
+            html = '<tr><td colspan="5" class="text-center p-4 text-muted">ไม่มีรายการยืมในขณะนี้</td></tr>';
+        }
+        listElement.innerHTML = html;
+    } catch (error) {
+        console.error("Error loading dashboard borrows:", error);
+    }
+}
+
+// ฟังก์ชันสร้างกราฟสถิติอุปกรณ์
+let deviceChart;
+function renderDeviceChart() {
+    const ctx = document.getElementById('deviceDoughnutChart')?.getContext('2d');
+    if (!ctx) return;
+
+    const available = parseInt(document.getElementById('total-available').innerText) || 0;
+    const borrowed = parseInt(document.getElementById('total-borrowed').innerText) || 0;
+    const statusRepair = parseInt(document.getElementById('total-repair-status').innerText) || 0;
+
+    if (deviceChart) deviceChart.destroy();
+
+    deviceChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['ว่าง', 'ยืมอยู่', 'ซ่อม'],
+            datasets: [{
+                data: [available, borrowed, statusRepair],
+                backgroundColor: ['#0C7779', '#E5BA41', '#EA7B7B'],
+                borderWidth: 0,
+                hoverOffset: 15 // เพิ่ม Effect เวลาเอาเมาส์ชี้
+            }]
+        },
+        options: {
+            cutout: '70%',
+            // เพิ่มส่วนการคลิกตรงนี้
+            onClick: (evt, item) => {
+                if (item.length > 0) {
+                    const index = item[0].index;
+                    const label = deviceChart.data.labels[index];
+                    
+                    // กำหนดเงื่อนไขว่าถ้าคลิกแต่ละสีจะให้ไปที่ไหน
+                    switch (label) {
+                        case 'ว่าง':
+                            window.location.href = 'available.html';
+                            break;
+                        case 'ยืมอยู่':
+                             window.location.href = 'borrowed.html';
+                            break;
+                        case 'ซ่อม':
+                            window.location.href = 'status_repair.html';
+                            break;
+                    }
+                }
+            },
+            // เปลี่ยนรูปเมาส์เป็นรูปมือเมื่อชี้บนกราฟเพื่อให้รู้ว่ากดได้
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
+            plugins: {
+                legend: { 
+                    position: 'bottom', 
+                    labels: { usePointStyle: true, padding: 20 } 
+                }
+            }
+        }
+    });
+}
+
+// อัปเดตฟังก์ชัน updateDashboardStats เดิมให้เรียกข้อมูลใหม่เพิ่ม
+const originalStatsFunction = updateDashboardStats;
+updateDashboardStats = async function() {
+    await originalStatsFunction(); // เรียกของเดิมที่อัปเดตตัวเลข
+    loadRecentBorrows();           // โหลดตารางยืมล่าสุด
+    setTimeout(renderDeviceChart, 600); // วาดกราฟ (รอตัวเลขโหลดเสร็จแป๊บหนึ่ง)
+};
+
+
 function searchRepairLogs() {
     loadRepairLogs(1);
 }

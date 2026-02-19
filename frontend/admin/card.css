@@ -1,0 +1,36 @@
+.stat-card {
+        background: linear-gradient(135deg, #0b84e7 100%); 
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: left;
+        margin-bottom: 20px;
+    }
+
+    .secondary001 {
+            background: linear-gradient(135deg, #E5BA41 100%);
+            color: rgb(255, 250, 250);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: left;
+        margin-bottom: 20px
+        }
+
+        .secondary002 {
+            background: linear-gradient(135deg, #EA7B7B 100%); /* สีแดง/ส้ม สำหรับงานซ่อม */
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: left;
+        margin-bottom: 20px;
+    }
+
+    .secondary003 {
+      background: linear-gradient(135deg, #0C7779 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: left;
+        margin-bottom: 20px;
+    }
+    
