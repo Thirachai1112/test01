@@ -20,5 +20,8 @@
     "qrcode": "^1.5.4",
     "uuid": "^13.0.0"
   },
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "tailwindcss": "^4.2.0"
+  }
 }

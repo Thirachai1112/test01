@@ -764,6 +764,7 @@ function displayRepairLogs(repairs) {
                 <td><code>${repair.asset_number || '-'}</code></td>
                 <td>${repair.affiliation || '-'}</td>
                 <td title="${repair.problem || ''}">${problemText}</td>
+                <td title="${repair.Procedure || ''}">${repair.Procedure || '-'}</td>
                 <td class="text-nowrap"><small>${createdDate}</small></td>
                 <td class="text-nowrap"><small>${updatedDate}</small></td>
                 <td>${fileHtml}</td>
@@ -874,6 +875,7 @@ function renderDeviceChart() {
 
     const available = parseInt(document.getElementById('total-available').innerText) || 0;
     const borrowed = parseInt(document.getElementById('total-borrowed').innerText) || 0;
+    const totalItems = parseInt(document.getElementById('total-items').innerText) || 0;
     const statusRepair = parseInt(document.getElementById('total-repair-status').innerText) || 0;
 
     if (deviceChart) deviceChart.destroy();
@@ -881,10 +883,10 @@ function renderDeviceChart() {
     deviceChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['ว่าง', 'ยืมอยู่', 'ซ่อม'],
+            labels: ['ว่าง', 'อะไหล่คอมที่นำไปซ่อม','ยืมอยู่', 'ซ่อม'],
             datasets: [{
-                data: [available, borrowed, statusRepair],
-                backgroundColor: ['#0C7779', '#E5BA41', '#EA7B7B'],
+                data: [available, totalItems - available - borrowed, borrowed, statusRepair],
+                backgroundColor: ['#0C7779', '#e79316', '#E5BA41', '#EA7B7B'],
                 borderWidth: 0,
                 hoverOffset: 15 // เพิ่ม Effect เวลาเอาเมาส์ชี้
             }]

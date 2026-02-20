@@ -765,11 +765,11 @@ app.get('/api/repair', (req, res) => {
     const searchCondition = search
         ? ` WHERE r.brand LIKE ? OR r.contract_number LIKE ? OR r.serial_number LIKE ? 
             OR r.asset_number LIKE ? OR r.problem LIKE ? OR r.employee_name LIKE ? 
-            OR r.employees_code LIKE ? OR r.affiliation LIKE ? `
+            OR r.employees_code LIKE ? OR r.affiliation LIKE ? OR r.Problem LIKE ? `
         : '';
 
     const searchParams = search
-        ? Array(8).fill(`%${search}%`)
+        ? Array(9).fill(`%${search}%`)
         : [];
 
     // 2. นับจำนวนรายการทั้งหมด
@@ -798,6 +798,7 @@ app.get('/api/repair', (req, res) => {
                 r.created_at,
                 r.updated_at,
                 r.item_id,
+                r.\`Procedure\`,
                 -- ถ้าในตาราง repair มีชื่อพนักงาน ให้ใช้ชื่อนั้น ถ้าไม่มีค่อยดึงจาก JOIN (Fallback)
                 COALESCE(r.employee_name, CONCAT(e.first_name, ' ', e.last_name)) AS employee_name,
                 COALESCE(r.employees_code, e.employees_code) AS employees_code,
@@ -860,7 +861,8 @@ app.get('/api/repair-management', (req, res) => {
             status, 
             created_at, 
             finished_at,
-            repair_url
+            repair_url,
+            \`Procedure\`,
         FROM repair 
         WHERE status != 'Fixed'
         ORDER BY created_at DESC
@@ -894,7 +896,8 @@ app.get('/api/repair-status', (req, res) => {
             problem, 
             status, 
             created_at, 
-            repair_url
+            repair_url,
+            \`Procedure\`
         FROM repair
         -- แก้ไขตรงนี้: ดึงเฉพาะ 'รอรับเรื่อง' และ 'กำลังซ่อม' เท่านั้น
         WHERE status IN ('Pending', 'In Progress')
@@ -914,10 +917,15 @@ app.get('/api/repair-status', (req, res) => {
 // API สำหรับอัปเดตสถานะการซ่อม (รองรับการกดปุ่ม รับงาน และ ปิดงาน)
 app.put('/api/repair/status/:id', (req, res) => {
     const repairId = req.params.id;
-    const { status, item_id } = req.body;
+    const { status, item_id, procedure } = req.body;
 
     let sql = "UPDATE repair SET status = ?, updated_at = NOW()";
     let params = [status];
+
+    if (procedure) {
+        sql += ", `Procedure` = ?";
+        params.push(procedure);
+    }
 
     if (status === 'Fixed') {
         sql += ", finished_at = NOW()";

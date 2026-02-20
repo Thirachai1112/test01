@@ -177,9 +177,11 @@
                 <h3 class="header-title mb-1"><i class="fas fa-microchip text-primary me-2"></i>ระบบบริหารงานซ่อม</h3>
                 <p class="text-muted small mb-0">ติดตามและจัดการสถานะอุปกรณ์ส่งซ่อมแบบ Real-time</p>
             </div>
-            <button class="btn btn-white shadow-sm rounded-pill px-4 btn-sm border" onclick="loadRepairData()">
-                <i class="fas fa-sync-alt me-2 text-primary"></i> อัปเดตข้อมูล
-            </button>
+            
+                <a href="index.html" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i> กลับหน้าหลัก
+        </a>
+            
         </div>
 
         <div class="table-responsive">
@@ -192,6 +194,7 @@
                         <th>รหัส S/N</th>
                         <th>เลขที่สัญญา</th>
                         <th>อาการเสีย</th>
+                        <th>ขั้นตอนการซ่อม</th>
                         <th>วันที่แจ้ง</th>
                         <th>สถานะ</th>
                         <th>หลักฐาน</th>
@@ -259,6 +262,7 @@
                 <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
                 <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
                 <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
+                <td><div class="text-truncate" style="max-width: 150px;" title="${repair.Procedure}">${repair.Procedure}</div></td>
                 <td><small class="text-muted">${date}</small></td>
                 <td><span class="status-pill ${statusClass}">${statusText}</span></td>
                 <td>${fileHtml}</td>
@@ -286,25 +290,42 @@
         }
 
         async function finishRepair(repairId, itemId) {
-            const confirm = await Swal.fire({
-                title: 'ยืนยันการซ่อมเสร็จสิ้น?',
-                text: "สถานะอุปกรณ์จะถูกเปลี่ยนเป็น 'พร้อมใช้งาน'",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#06d6a0'
-            });
-            if (confirm.isConfirmed) {
-                const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Fixed' })
-                });
-                if (res.ok) {
-                    Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
-                    loadRepairData();
-                }
+    // 1. แสดง Popup พร้อมช่องกรอกข้อมูล (Textarea)
+    const { value: repairProcedure } = await Swal.fire({
+        title: 'ระบุรายละเอียดการซ่อม',
+        input: 'textarea',
+        inputLabel: 'ขั้นตอนการดำเนินงาน / วิธีแก้ไข',
+        inputPlaceholder: 'เช่น เปลี่ยนบอร์ดใหม่, ลงโปรแกรมใหม่...',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกและปิดงาน',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#06d6a0',
+        preConfirm: (value) => {
+            if (!value) {
+                Swal.showValidationMessage('กรุณากรอกขั้นตอนการซ่อมก่อนปิดงาน');
             }
+            return value;
         }
+    });
+
+    // 2. ถ้ามีการกรอกข้อมูลและกดยืนยัน
+    if (repairProcedure) {
+        const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                status: 'Fixed', 
+                item_id: itemId,
+                procedure: repairProcedure // ส่งข้อมูลที่กรอกในช่อง textarea ไปยัง Backend
+            })
+        });
+
+        if (res.ok) {
+            Swal.fire('สำเร็จ!', 'บันทึกขั้นตอนการซ่อมและปิดงานแล้ว', 'success');
+            loadRepairData();
+        }
+    }
+}
 
         document.addEventListener('DOMContentLoaded', loadRepairData);
     </script>

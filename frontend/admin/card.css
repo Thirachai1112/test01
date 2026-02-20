@@ -17,7 +17,7 @@
         }
 
         .secondary002 {
-            background: linear-gradient(135deg, #EA7B7B 100%); /* สีแดง/ส้ม สำหรับงานซ่อม */
+            background: linear-gradient(135deg, #e28902 100%); /* สีแดง/ส้ม สำหรับงานซ่อม */
         color: white;
         padding: 20px;
         border-radius: 8px;
@@ -27,6 +27,15 @@
 
     .secondary003 {
       background: linear-gradient(135deg, #0C7779 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: left;
+        margin-bottom: 20px;
+    }
+
+    .secondary004 {
+      background: linear-gradient(135deg, #e24e4e 100%);
         color: white;
         padding: 20px;
         border-radius: 8px;
