@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script src="THSarabunIT๙-bold.js"></script>
+
+<script src="pdf-generator.js"></script>
+</head>
+<body style="font-family: 'Tahoma', sans-serif; padding: 50px; background-color: #f4f7f6;">
+    <div style="max-width: 400px; margin: auto; padding: 30px; background: white; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+        <h3 style="color: #333;">จัดการข้อมูลการซ่อม</h3>
+        <button onclick="handleFinishAndGeneratePDF({ 
+                    brand: 'DELL', 
+                    asset_number: 'PEA-12345', 
+                    serial_number: 'SN-9999', 
+                    contract_number: '67/2569' 
+                })" 
+                style="background-color: #06d6a0; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px;">
+            กรอกข้อมูล & Gen PDF
+        </button>
+    </div>
+</body>
+</html>

@@ -20,6 +20,8 @@ const storage = multer.diskStorage({
             folder = 'uploads/repairs';
         } else if (req.originalUrl.includes('borrow')) {
             folder = 'uploads/borrowing';
+        }  else if (req.originalUrl.includes('report')) {
+            folder = 'uploads/reports';
         }
 
         // ตรวจสอบและสร้างโฟลเดอร์อัตโนมัติ
@@ -40,6 +42,7 @@ const upload = multer({ storage: storage });
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
 app.use('/uploads/repairs', express.static(path.join(__dirname, 'uploads/repairs')));
 app.use('/uploads/borrowing', express.static(path.join(__dirname, 'uploads/borrowing')));
+app.use('/uploads/reports', express.static(path.join(__dirname, 'uploads/reports')));
 app.use('/qrcodes', express.static(path.join(__dirname, 'generated_qrcodes')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(cors());
@@ -917,7 +920,7 @@ app.get('/api/repair-status', (req, res) => {
 // API สำหรับอัปเดตสถานะการซ่อม (รองรับการกดปุ่ม รับงาน และ ปิดงาน)
 app.put('/api/repair/status/:id', (req, res) => {
     const repairId = req.params.id;
-    const { status, item_id, procedure } = req.body;
+    const { status, item_id, procedure, report_url } = req.body;
 
     let sql = "UPDATE repair SET status = ?, updated_at = NOW()";
     let params = [status];
@@ -926,7 +929,10 @@ app.put('/api/repair/status/:id', (req, res) => {
         sql += ", `Procedure` = ?";
         params.push(procedure);
     }
-
+    if (report_url) {
+        sql += ", report_url = ?";
+        params.push(report_url);
+    }
     if (status === 'Fixed') {
         sql += ", finished_at = NOW()";
     }
@@ -943,6 +949,14 @@ app.put('/api/repair/status/:id', (req, res) => {
         }
 
         res.json({ success: true });
+    });
+});
+
+app.post('/api/upload-report', upload.single('report_file'), (req, res) => {
+    if (!req.file) return res.status(400).send('ไม่ได้ส่งไฟล์มา');
+    res.json({ 
+        success: true, 
+        file_name: req.file.filename // ส่งชื่อไฟล์ที่ถูกตั้งใหม่กลับไปให้ Frontend
     });
 });
 

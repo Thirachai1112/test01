@@ -10,7 +10,14 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&family=Sarabun:wght@400;600&display=swap"
         rel="stylesheet">
-    <style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script src="THSarabun-Bold.js"></script>
+
+<script src="pdf-generator.js"></script>
+    <style>       
         :root {
             --primary-color: #4361ee;
             --pending-color: #ff4d6d;
@@ -220,38 +227,66 @@
         }
 
         function displayRepairs(repairs) {
-            const body = document.getElementById('repair-table-body');
-            body.innerHTML = '';
+    const body = document.getElementById('repair-table-body');
+    body.innerHTML = '';
 
-            // ใส่ (repair, index) เพื่อดึงลำดับมาใช้
-            repairs.forEach((repair, index) => {
-                const date = new Date(repair.created_at).toLocaleDateString('th-TH', {
-                    day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
-                });
+    repairs.forEach((repair, index) => {
+        const date = new Date(repair.created_at).toLocaleDateString('th-TH', {
+            day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
 
-                // จัดการเรื่องรูปภาพหลักฐาน
-                let fileHtml = '-';
-                if (repair.repair_url) {
-                    const files = repair.repair_url.split(',');
-                    fileHtml = files.map(filename => {
-                        const cleanName = filename.trim();
-                        const fullUrl = `${API_BASE}/uploads/repairs/${cleanName}`;
-                        const isPDF = cleanName.toLowerCase().endsWith('.pdf');
+        // 1. จัดการรูปภาพหลักฐานการแจ้งซ่อม (ที่มีอยู่เดิม)
+        let fileHtml = '-';
+        if (repair.repair_url) {
+            const files = repair.repair_url.split(',');
+            fileHtml = files.map(filename => {
+                const cleanName = filename.trim();
+                const fullUrl = `${API_BASE}/uploads/repairs/${cleanName}`;
+                const isPDF = cleanName.toLowerCase().endsWith('.pdf');
+                const icon = isPDF ? 'fas fa-file-pdf text-danger' : 'fas fa-image text-primary';
+                return `<a href="${fullUrl}" target="_blank" class="btn-action btn-view me-1" title="ดูหลักฐานแจ้งซ่อม">
+                            <i class="${icon}"></i>
+                        </a>`;
+            }).join('');
+        }
 
-                        // ถ้าเป็น PDF ให้ใช้ไอคอนไฟล์เอกสาร ถ้าเป็นรูปให้ใช้ไอคอนรูปภาพ
-                        const icon = isPDF ? 'fas fa-file-pdf text-danger' : 'fas fa-image text-primary';
+        // 2. กำหนดสีและข้อความตามสถานะ
+        let statusClass = '';
+        let statusText = '';
+        
+        if (repair.status === 'Pending') {
+            statusClass = 'status-pending';
+            statusText = '<i class="fas fa-clock"></i> รอรับเรื่อง';
+        } else if (repair.status === 'In Progress') {
+            statusClass = 'status-progress';
+            statusText = '<i class="fas fa-tools"></i> กำลังซ่อม';
+        } else {
+            statusClass = 'status-fixed';
+            statusText = '<i class="fas fa-check-circle"></i> เสร็จสิ้น';
+        }
 
-                        // สำคัญ: ห้ามใส่ attribute 'download' เพื่อให้มันเปิดใน tab ใหม่
-                        return `<a href="${fullUrl}" target="_blank" class="btn-action btn-view me-1" title="เปิดดูไฟล์">
-                <i class="${icon}"></i>
-            </a>`;
-                    }).join('');
-                }
+        // 3. จัดการปุ่มในคอลัมน์ "จัดการ"
+        let actionButtons = '';
+        if (repair.status === 'Pending') {
+            actionButtons = `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`;
+        } else if (repair.status === 'In Progress') {
+            // ส่งข้อมูล repair เข้าไปเพื่อใช้ในขั้นตอน Gen PDF
+            actionButtons = `<button class="btn btn-update shadow-sm text-success" onclick='finishRepair(${repair.repair_id}, ${repair.item_id}, ${JSON.stringify(repair)})'>ปิดงาน</button>`;
+        } else if (repair.status === 'Fixed') {
+            // ถ้าซ่อมเสร็จแล้ว และมีชื่อไฟล์รายงานใน report_url ให้แสดงปุ่มเปิด PDF
+            actionButtons = `
+                <div class="d-flex flex-column align-items-center gap-1">
+                    <span class="badge bg-light text-success mb-1">สำเร็จแล้ว</span>
+                    ${repair.report_url ? 
+                        `<a href="${API_BASE}/uploads/reports/${repair.report_url}" target="_blank" class="btn btn-sm btn-outline-danger shadow-sm">
+                            <i class="fas fa-file-pdf"></i> ดูรายงาน PDF
+                         </a>` : 
+                        `<small class="text-muted">ไม่มีไฟล์รายงาน</small>`
+                    }
+                </div>`;
+        }
 
-                const statusClass = repair.status === 'Pending' ? 'status-pending' : 'status-progress';
-                const statusText = repair.status === 'Pending' ? '<i class="fas fa-clock"></i> รอรับเรื่อง' : '<i class="fas fa-tools"></i> กำลังซ่อม';
-
-                body.innerHTML += `
+        body.innerHTML += `
             <tr>
                 <td><span class="text-muted fw-bold">${index + 1}</span></td>
                 <td>
@@ -262,22 +297,15 @@
                 <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
                 <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
                 <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
-                <td><div class="text-truncate" style="max-width: 150px;" title="${repair.Procedure}">${repair.Procedure}</div></td>
+                <td><div class="text-truncate" style="max-width: 150px;" title="${repair.Procedure || '-'}">${repair.Procedure || '-'}</div></td>
                 <td><small class="text-muted">${date}</small></td>
                 <td><span class="status-pill ${statusClass}">${statusText}</span></td>
                 <td>${fileHtml}</td>
-                <td class="text-center">
-    ${repair.status === 'Pending'
-                        ? `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`
-                        : repair.status === 'In Progress'
-                            ? `<button class="btn btn-update shadow-sm text-success" onclick="finishRepair(${repair.repair_id}, ${repair.item_id})">ปิดงาน</button>`
-                            : `<span class="badge bg-light text-success"><i class="fas fa-check-circle"></i> เสร็จสิ้นแล้ว</span>`
-                    }
-</td>
+                <td class="text-center">${actionButtons}</td>
             </tr>
         `;
-            });
-        }
+    });
+}
 
         // Logic functions (updateStatus, finishRepair) remains same as previous version but linked here
         async function updateStatus(repairId, status) {
@@ -289,15 +317,16 @@
             if (res.ok) loadRepairData();
         }
 
-        async function finishRepair(repairId, itemId) {
-    // 1. แสดง Popup พร้อมช่องกรอกข้อมูล (Textarea)
+        // แก้ไขฟังก์ชัน finishRepair ใหม่ทั้งหมด
+async function finishRepair(repairId, itemId, repairData) {
+    // 1. แสดง Popup ให้กรอกรายละเอียดการซ่อม (Procedure)
     const { value: repairProcedure } = await Swal.fire({
         title: 'ระบุรายละเอียดการซ่อม',
         input: 'textarea',
         inputLabel: 'ขั้นตอนการดำเนินงาน / วิธีแก้ไข',
         inputPlaceholder: 'เช่น เปลี่ยนบอร์ดใหม่, ลงโปรแกรมใหม่...',
         showCancelButton: true,
-        confirmButtonText: 'บันทึกและปิดงาน',
+        confirmButtonText: 'บันทึกและสร้าง PDF',
         cancelButtonText: 'ยกเลิก',
         confirmButtonColor: '#06d6a0',
         preConfirm: (value) => {
@@ -308,21 +337,27 @@
         }
     });
 
-    // 2. ถ้ามีการกรอกข้อมูลและกดยืนยัน
+    // 2. ถ้าผู้ใช้กดยืนยัน (ได้ค่า Procedure มา)
     if (repairProcedure) {
-        const res = await fetch(`${API_BASE}/api/repair/status/${repairId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                status: 'Fixed', 
-                item_id: itemId,
-                procedure: repairProcedure // ส่งข้อมูลที่กรอกในช่อง textarea ไปยัง Backend
-            })
-        });
+        // นำข้อมูลเดิมมารวมกับขั้นตอนการซ่อมที่เพิ่งกรอก
+        const finalData = { 
+            ...repairData, 
+            Procedure: repairProcedure,
+            repair_id: repairId, // มั่นใจว่ามี ID
+            item_id: itemId     // มั่นใจว่ามี item_id เพื่อปลดล็อกสถานะอุปกรณ์
+        };
 
-        if (res.ok) {
-            Swal.fire('สำเร็จ!', 'บันทึกขั้นตอนการซ่อมและปิดงานแล้ว', 'success');
-            loadRepairData();
+        // 3. เรียกฟังก์ชันจากไฟล์ pdf-generator.js 
+        // ฟังก์ชันนี้จะทำหน้าที่: 
+        // - ถามเลขที่อนุมัติ/วันที่/วงเงิน 
+        // - Gen PDF 
+        // - Upload ไฟล์ 
+        // - Update Status เป็น 'Fixed' พร้อมชื่อไฟล์ PDF ใน DB
+        if (typeof handleFinishAndGeneratePDF === 'function') {
+            handleFinishAndGeneratePDF(finalData);
+        } else {
+            console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator.js");
+            Swal.fire('Error', 'ไม่สามารถเรียกใช้ระบบสร้าง PDF ได้', 'error');
         }
     }
 }
