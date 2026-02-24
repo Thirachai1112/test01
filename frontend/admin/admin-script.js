@@ -12,7 +12,7 @@ let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
-const SERVER_IP = "192.168.1.159";
+const SERVER_IP = "192.168.100.33";
 
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
@@ -221,7 +221,11 @@ async function updateDashboardStats() {
         const totalItems = allItems.length;
         const availableCount = allItems.filter(i => i.status === 'Available').length;
         const borrowedCount = allItems.filter(i => i.status === 'Borrowed').length;
-        const repairCount = allItems.filter(i => i.status === 'Scrapped').length;
+        
+        // ดึงข้อมูลจำนวนอุปกรณ์ที่นำไปซ่อม จากตาราง item_repair
+        const repairResponse = await fetch(`http://localhost:5000/api/repair-items`);
+        const repairData = await repairResponse.json();
+        const repairCount = repairData.success ? repairData.data.length : 0;
 
         // ฟังก์ชันช่วยเช็ค ID ก่อนอัปเดตค่า
         const updateIfExist = (id, value) => {
@@ -850,7 +854,7 @@ async function loadRecentBorrows() {
             recentBorrows.forEach(log => {
                 const borrowDate = new Date(log.borrow_date).toLocaleDateString('th-TH');
                 html += `
-                <tr>
+                <tr style="cursor: pointer;" onclick="showBorrowDetail(${log.log_id})" class="hover-row">
                     <td class="ps-4"><strong>${log.employee_name}</strong></td>
                     <td>${log.item_name}</td>
                     <td><span class="badge bg-info text-white font-monospace">${log.serial_number || '-'}</span></td>
@@ -883,7 +887,7 @@ function renderDeviceChart() {
     deviceChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['ว่าง', 'อะไหล่คอมที่นำไปซ่อม','ยืมอยู่', 'ซ่อม'],
+            labels: ['ว่าง','ยืมอยู่', 'ซ่อม'],
             datasets: [{
                 data: [available, totalItems - available - borrowed, borrowed, statusRepair],
                 backgroundColor: ['#0C7779', '#e79316', '#E5BA41', '#EA7B7B'],
@@ -903,6 +907,9 @@ function renderDeviceChart() {
                     switch (label) {
                         case 'ว่าง':
                             window.location.href = 'available.html';
+                            break;
+                        case 'อะไหล่คอมที่นำไปซ่อม':
+                            window.location.href = 'repair.html';
                             break;
                         case 'ยืมอยู่':
                              window.location.href = 'borrowed.html';
@@ -925,6 +932,47 @@ function renderDeviceChart() {
             }
         }
     });
+}
+
+// ฟังก์ชันแสดงรายละเอียดการยืม
+async function showBorrowDetail(logId) {
+    try {
+        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const data = await response.json();
+        const log = data.logs.find(l => l.log_id === logId);
+        
+        if (!log) {
+            Swal.fire('ไม่พบข้อมูล', 'ไม่พบรายการยืมนี้', 'error');
+            return;
+        }
+        
+        const borrowDate = new Date(log.borrow_date).toLocaleString('th-TH');
+        const returnDate = log.return_date ? new Date(log.return_date).toLocaleString('th-TH') : '-';
+        const status = log.return_date ? '<span class="badge bg-success">คืนแล้ว</span>' : '<span class="badge bg-warning text-dark">กำลังยืม</span>';
+        
+        Swal.fire({
+            title: 'รายละเอียดการยืม',
+            html: `
+                <div class="text-start" style="font-size: 0.95rem;">
+                    <div class="mb-3"><strong>ชื่อพนักงาน:</strong> ${log.employee_name}</div>
+                    <div class="mb-3"><strong>หน่วยงาน:</strong> ${log.Affiliation || '-'}</div>
+                    <div class="mb-3"><strong>อุปกรณ์:</strong> ${log.item_name}</div>
+                    <div class="mb-3"><strong>Serial Number:</strong> <code>${log.serial_number || '-'}</code></div>
+                    <div class="mb-3"><strong>วัตถุประสงค์:</strong> ${log.purpose || '-'}</div>
+                    <div class="mb-3"><strong>วันที่ยืม:</strong> ${borrowDate}</div>
+                    <div class="mb-3"><strong>วันที่คืน:</strong> ${returnDate}</div>
+                    <div class="mb-3"><strong>สถานะ:</strong> ${status}</div>
+                    ${log.note ? `<div class="mb-3"><strong>หมายเหตุ:</strong> ${log.note}</div>` : ''}
+                </div>
+            `,
+            width: 600,
+            confirmButtonText: 'ปิด',
+            confirmButtonColor: '#667eea'
+        });
+    } catch (error) {
+        console.error('Error showing borrow detail:', error);
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้', 'error');
+    }
 }
 
 // อัปเดตฟังก์ชัน updateDashboardStats เดิมให้เรียกข้อมูลใหม่เพิ่ม
