@@ -267,12 +267,20 @@
 
         // 3. จัดการปุ่มในคอลัมน์ "จัดการ"
         let actionButtons = '';
-        if (repair.status === 'Pending') {
-            actionButtons = `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`;
-        } else if (repair.status === 'In Progress') {
-            // ส่งข้อมูล repair เข้าไปเพื่อใช้ในขั้นตอน Gen PDF
-            actionButtons = `<button class="btn btn-update shadow-sm text-success" onclick='finishRepair(${repair.repair_id}, ${repair.item_id}, ${JSON.stringify(repair)})'>ปิดงาน</button>`;
-        } else if (repair.status === 'Fixed') {
+if (repair.status === 'Pending') {
+    actionButtons = `<button class="btn btn-update shadow-sm" onclick="updateStatus(${repair.repair_id}, 'In Progress')">รับงาน</button>`;
+} else if (repair.status === 'In Progress') {
+    
+    // ✅ เพิ่มบรรทัดนี้เพื่อป้องกันค่า NULL และประกาศตัวแปร
+    const safeItemId = repair.item_id || 0; 
+
+    // ส่งข้อมูล repair เข้าไปเพื่อใช้ในขั้นตอน Gen PDF
+    actionButtons = `
+        <button class="btn btn-update shadow-sm text-success" 
+            onclick='finishRepair(${repair.repair_id}, ${safeItemId}, ${JSON.stringify(repair).replace(/'/g, "&apos;")})'>
+            ปิดงาน
+        </button>`;
+} else if (repair.status === 'Fixed') { 
             // ถ้าซ่อมเสร็จแล้ว และมีชื่อไฟล์รายงานใน report_url ให้แสดงปุ่มเปิด PDF
             actionButtons = `
                 <div class="d-flex flex-column align-items-center gap-1">

@@ -93,10 +93,16 @@ ${centerSpace}วันที่ ..........................
     try {
         // 1. ส่งไฟล์ไปเก็บที่ Server
         const uploadRes = await fetch(`${API_BASE}/api/upload-report`, {
-            method: 'POST',
-            body: formData
-        });
-        const uploadResult = await uploadRes.json();
+    method: 'POST',
+    body: formData
+});
+
+if (!uploadRes.ok) {
+    const errorText = await uploadRes.text();
+    throw new Error(`Upload failed: ${uploadRes.status} - ${errorText}`);
+}
+
+const uploadResult = await uploadRes.json();
 
         if (uploadResult.success) {
             // 2. อัปเดตชื่อไฟล์ลง Database (Column: report_url) และปิดงาน

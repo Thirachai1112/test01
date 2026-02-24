@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
             folder = 'uploads/repairs';
         } else if (req.originalUrl.includes('borrow')) {
             folder = 'uploads/borrowing';
-        }  else if (req.originalUrl.includes('report')) {
+        } else if (req.originalUrl.includes('report')) {
             folder = 'uploads/reports';
         }
 
@@ -60,6 +60,13 @@ const db = mysql.createPool({
     connectionLimit: 10
 });
 
+app.post('/api/upload-report', upload.single('report_file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    res.json({
+        success: true,
+        file_name: req.file.filename
+    });
+});
 
 app.get('/items', (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -689,10 +696,10 @@ app.post('/admin/login', (req, res) => {
 
 
 app.post('/api/repair', upload.array('files', 5), (req, res) => {
-    const { 
-        brand, contract_number, serial_number, asset_number, 
-        affiliation, problem, item_id, 
-        employee_name, employees_code, phone_number 
+    const {
+        brand, contract_number, serial_number, asset_number,
+        affiliation, problem, item_id,
+        employee_name, employees_code, phone_number
     } = req.body;
 
     const uploadedFiles = req.files;
@@ -715,8 +722,8 @@ app.post('/api/repair', upload.array('files', 5), (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`;
 
         const values = [
-            brand, contract_number, serial_number, asset_number, 
-            affiliation, problem, filePaths, empId, 
+            brand, contract_number, serial_number, asset_number,
+            affiliation, problem, filePaths, empId,
             finalName, finalCode, finalPhone, item_id
         ];
 
@@ -740,7 +747,7 @@ app.post('/api/repair', upload.array('files', 5), (req, res) => {
             JOIN employees e ON bl.employee_id = e.id 
             WHERE bl.item_id = ? 
             ORDER BY bl.borrow_date DESC LIMIT 1`;
-        
+
         db.query(getEmployeeSql, [item_id], (empErr, empResult) => {
             if (empErr || empResult.length === 0) {
                 saveRepairData(null, null, null, null);
@@ -865,7 +872,7 @@ app.get('/api/repair-management', (req, res) => {
             created_at, 
             finished_at,
             repair_url,
-            \`Procedure\`,
+            \`Procedure\`
         FROM repair 
         WHERE status != 'Fixed'
         ORDER BY created_at DESC
@@ -893,17 +900,17 @@ app.get('/api/repair-status', (req, res) => {
             serial_number, 
             contract_number,
             employee_name, 
-            employees_code AS employee_id,
-            phone_number AS phone,
-            affiliation AS department,
+            employees_code AS employee_id, -- Alias เป็น employee_id
+            phone_number AS phone,          -- Alias เป็น phone
+            affiliation AS department,     -- Alias เป็น department
             problem, 
             status, 
             created_at, 
             repair_url,
             \`Procedure\`
         FROM repair
-        -- แก้ไขตรงนี้: ดึงเฉพาะ 'รอรับเรื่อง' และ 'กำลังซ่อม' เท่านั้น
-        WHERE status IN ('Pending', 'In Progress')
+        -- แก้ไข: เพิ่ม Maintenance และ Repair เข้าไปเพื่อให้ครอบคลุมสถานะที่อาจเกิดขึ้น
+        WHERE status IN ('Pending', 'In Progress', 'Maintenance', 'Repair')
         ORDER BY created_at DESC
     `;
 
@@ -918,48 +925,87 @@ app.get('/api/repair-status', (req, res) => {
 
 
 // API สำหรับอัปเดตสถานะการซ่อม (รองรับการกดปุ่ม รับงาน และ ปิดงาน)
-app.put('/api/repair/status/:id', (req, res) => {
+// ปรับปรุง API อัปเดตสถานะการซ่อม
+app.put('/api/repair/status/:id', async (req, res) => {
     const repairId = req.params.id;
     const { status, item_id, procedure, report_url } = req.body;
 
-    let sql = "UPDATE repair SET status = ?, updated_at = NOW()";
-    let params = [status];
+    // --- 1. กรณีอัปเดตสถานะทั่วไป (เช่น กดรับงาน 'In Progress') ---
+    if (status !== 'Fixed') {
+        const sql = "UPDATE repair SET status = ?, updated_at = NOW() WHERE repair_id = ?";
+        db.query(sql, [status, repairId], (err) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            return res.json({ success: true });
+        });
+        return;
+    }
 
-    if (procedure) {
-        sql += ", `Procedure` = ?";
-        params.push(procedure);
-    }
-    if (report_url) {
-        sql += ", report_url = ?";
-        params.push(report_url);
-    }
-    if (status === 'Fixed') {
-        sql += ", finished_at = NOW()";
-    }
-    
-    sql += " WHERE repair_id = ?";
-    params.push(repairId);
+    // --- 2. กรณีปิดงาน (Fixed) ---
+    const connection = await db.promise().getConnection();
+    try {
+        await connection.beginTransaction();
 
-    db.query(sql, params, (err, result) => {
+        // ก. ตรวจสอบข้อมูลใบแจ้งซ่อม
+        const [repairRows] = await connection.query("SELECT problem FROM repair WHERE repair_id = ?", [repairId]);
+        if (repairRows.length === 0) throw new Error('ไม่พบข้อมูลใบแจ้งซ่อม');
+
+        // ข. บันทึกลงตารางประวัติ item_repair (Minimalist)
+        // แก้ไข Error Unknown Column โดยการบันทึกแค่รหัสเชื่อมโยงตามโครงสร้างใหม่
+        const insertHistorySql = `INSERT INTO item_repair (repair_id, item_id) VALUES (?, ?)`;
+        await connection.query(insertHistorySql, [repairId, item_id]);
+
+        // ค. อัปเดตตาราง repair (ใส่ Procedure และชื่อไฟล์ PDF)
+        const updateRepairSql = `
+            UPDATE repair 
+            SET status = 'Fixed', \`Procedure\` = ?, report_url = ?, finished_at = NOW(), updated_at = NOW() 
+            WHERE repair_id = ?`;
+        await connection.query(updateRepairSql, [procedure, report_url, repairId]);
+
+        // ง. เปลี่ยนสถานะไอเทมเป็น 'Scrapped' 
+        // ** บรรทัดนี้จะผ่านได้ถ้าคุณรัน SQL ในขั้นตอนที่ 1 แล้วเท่านั้น **
+        await connection.query("UPDATE items SET status = 'Scrapped' WHERE item_id = ?", [item_id]);
+
+        await connection.commit();
+        res.json({ success: true, message: 'บันทึกประวัติและแทงจำหน่ายอุปกรณ์เรียบร้อยแล้ว' });
+
+    } catch (err) {
+        await connection.rollback();
+        console.error("❌ Transaction Error:", err);
+        // แสดงข้อความ Error ที่ชัดเจนหากลืมแก้ ENUM
+        const userFriendlyError = err.message.includes('Data truncated') 
+            ? "สถานะ 'Scrapped' ยังไม่ได้ถูกเพิ่มเข้าไปใน ENUM ของฐานข้อมูลตาราง items" 
+            : err.message;
+        res.status(500).json({ success: false, error: userFriendlyError });
+    } finally {
+        connection.release();
+    }
+});
+
+
+// ดึงข้อมูลจากตาราง repair_item (รายการอุปกรณ์ที่นำไปซ่อม)
+app.get('/api/repair-items', (req, res) => {
+    // JOIN items เพื่อเอาชื่อ/SN และ JOIN repair เพื่อเอาอาการเสีย
+    const sql = `
+        SELECT 
+            ir.archive_id,
+            ir.item_id,
+            ir.repair_id,
+            i.item_name,
+            i.asset_number,
+            i.serial_number,
+            r.problem AS problem_description,
+            ir.archived_at
+        FROM item_repair ir
+        JOIN items i ON ir.item_id = i.item_id
+        JOIN repair r ON ir.repair_id = r.repair_id
+        ORDER BY ir.archived_at DESC
+    `;
+
+    db.query(sql, (err, results) => {
         if (err) return res.status(500).json({ success: false, error: err.message });
-
-        // ถ้าซ่อมเสร็จ ให้ปลดล็อกอุปกรณ์ในตาราง items ให้พร้อมใช้งาน (Available)
-        if (status === 'Fixed' && item_id) {
-            db.query("UPDATE items SET status = 'Available' WHERE item_id = ?", [item_id]);
-        }
-
-        res.json({ success: true });
+        res.json({ success: true, data: results });
     });
 });
-
-app.post('/api/upload-report', upload.single('report_file'), (req, res) => {
-    if (!req.file) return res.status(400).send('ไม่ได้ส่งไฟล์มา');
-    res.json({ 
-        success: true, 
-        file_name: req.file.filename // ส่งชื่อไฟล์ที่ถูกตั้งใหม่กลับไปให้ Frontend
-    });
-});
-
 
 const PORT = 5000;
 console.log('Server is running on port 5000');

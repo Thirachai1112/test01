@@ -221,7 +221,7 @@ async function updateDashboardStats() {
         const totalItems = allItems.length;
         const availableCount = allItems.filter(i => i.status === 'Available').length;
         const borrowedCount = allItems.filter(i => i.status === 'Borrowed').length;
-        const repairCount = allItems.filter(i => i.status === 'Maintenance').length;
+        const repairCount = allItems.filter(i => i.status === 'Scrapped').length;
 
         // ฟังก์ชันช่วยเช็ค ID ก่อนอัปเดตค่า
         const updateIfExist = (id, value) => {
