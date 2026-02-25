@@ -56,7 +56,6 @@ async function handleFinishAndGeneratePDF(apiData) {
                 <label>11. ยอดตัวอักษร:</label> <input id="swal-input-total-text" class="swal2-input">
             </div>`,
         didOpen: () => {
-            // ระบบคำนวณเงินอัตโนมัติ
             const amountInput = document.getElementById('swal-input-amount');
             const vatInput = document.getElementById('swal-input-vat');
             const totalInput = document.getElementById('swal-input-total');
@@ -93,100 +92,150 @@ async function handleFinishAndGeneratePDF(apiData) {
 
 async function generateThaiPDF(formValues, apiData) {
     const { jsPDF } = window.jspdf;
-    // กำหนดขนาดเป็น A4 และหน่วยเป็น mm
-    const doc = new jsPDF('p', 'mm', 'a4'); 
+    const doc = new jsPDF();
     
-    // --- จัดการเรื่อง Font ---
-    // ต้องมีทั้ง Bold และ Normal เพื่อป้องกัน Error ใน Log
     if (typeof font === 'undefined') {
         Swal.fire('Error', 'ไม่พบข้อมูลฟอนต์ในระบบ', 'error');
         return;
     }
-    
+
     doc.addFileToVFS("THSarabun-Bold.ttf", font);
-    doc.addFont("THSarabun-Bold.ttf", "THSarabun", "normal");
     doc.addFont("THSarabun-Bold.ttf", "THSarabun", "bold");
-    
     doc.setFont("THSarabun", "bold");
 
-    // ส่วนหัวกระดาษ
+    let yPos = 10;
+
+    // ===== HEADER =====
     doc.setFontSize(18);
-    doc.text("การไฟฟ้าส่วนภูมิภาค", 105, 15, { align: 'center' });
-    doc.setFontSize(15);
-    doc.text("รายงานขอซื้อ/ขอจ้าง และอนุมัติดำเนินการสั่งซื้อ", 105, 22, { align: 'center' });
-    doc.text(`เลขที่ ฉ.2กดส.(ผคข.)            /2569`, 105, 29, { align: 'center' });
+    doc.text("การไฟฟ้าส่วนภูมิภาค", 105, yPos, { align: 'center' });
+    
+    yPos += 7;
+    doc.setFontSize(13);
+    doc.text("รายงานขอซื้อ/ขอจ้าง และอนุมัติดำเนินการสั่งจ้าง", 105, yPos, { align: 'center' });
+    
+    yPos += 5;
+    doc.setFontSize(11);
+    doc.text("เลขที่ ฉ.2กดส.(ผคข.)                 /2569", 105, yPos, { align: 'center' });
+    yPos += 5;
+    doc.text("ปีงบประมาณ 2568", 105, yPos, { align: 'center' });
+    
+    yPos += 12;
 
-    // เตรียมข้อมูลเนื้อหา
-    const sigSpace = "\n\n\n\n";
-    const introText1 = `เรียน หผ.คข.กดส.ฉ.2\n       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง...`; // ย่อตามฟอร์มจริง
-
+    // ===== MAIN TABLE (2 COLUMNS) =====
     doc.autoTable({
-        startY: 35,
-        theme: 'grid',
-        // ปรับ Margin เพื่อแก้ปัญหา "10 units width could not fit page"
-        margin: { left: 15, right: 15 },
-        body: [
-            [/* แถวที่ 1: ส่วนบนซ้าย/ขวา */],
-            [/* แถวที่ 2: ส่วนอนุมัติ */],
-            [{ content: '', colSpan: 2, styles: { minCellHeight: 140 } }] // แถวที่ 3 ที่คุณต้องการ
-        ],
-        columnStyles: {
-            0: { cellWidth: 90 }, // รวมกันได้ 180 (A4 กว้าง 210 - margin 30 = 180)
-            1: { cellWidth: 90 }
+        startY: yPos,
+        body: [[
+            // LEFT COLUMN
+            `เรียน หผ.คข.กดส.ฉ.2
+
+ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ดำเนินการ ดังนี้
+
+1. ค่าซ่อมเครื่อง ${apiData.brand || 'HPE PRODESSK 600 G2 MT'}
+   สัญญาเลขที่ ${apiData.contract_number || '-'}
+   Serial Number ${apiData.serial_number || '-'}
+   อาการ: ${apiData.problem || '-'}
+
+2. เบิกจ่ายจากรหัสบัญชี 53051060 ศูนย์ต้นทุน
+   E301023000 วงเงิน ${formValues.paymentDetails || '0.00'} บาท
+   (ราคารวมภาษีมูลค่าเพิ่ม)`,
+
+            // RIGHT COLUMN
+            `เรียน อก.ดส.ฉ.2
+
+เพื่อโปรดเห็นชอบรายงานขอ
+จัดซื้อ/จัดจ้าง ดำเนินการตาม
+รายการดังกล่าวข้างต้น ต่อไป
+
+
+
+                    ......................................
+                    (นายวีรภัทร ทวิศักดิ์)
+                    บรค.5 ผคข.กดส.ฉ.2
+                    วันที่ .........................`
+        ]],
+        didParseCell: (data) => {
+            data.cell.halign = 'left';
+            data.cell.valign = 'top';
         },
         styles: { 
             font: 'THSarabun', 
-            fontStyle: 'normal', // ป้องกัน Error: Unable to look up font label
-            fontSize: 14, 
+            fontSize: 11, 
             lineColor: [0, 0, 0], 
-            lineWidth: 0.2,
-            cellPadding: 3
+            lineWidth: 0.5, 
+            cellPadding: 5, 
+            valign: 'top' 
         },
-        didDrawCell: function (data) {
-            // ปรับแต่งแถวที่ 3 (index 2)
-            if (data.row.index === 2 && data.column.index === 0) {
-                const ctx = data.cell;
-                const centerX = ctx.x + (ctx.width / 2); // จุดกึ่งกลางเซลล์เป๊ะๆ
-                let yPos = ctx.y + 10;
-
-                doc.setFont("THSarabun", "normal");
-                doc.text(`เรียน อก.ดย.ฉ.2`, ctx.x + 5, yPos);
-                
-                yPos += 8;
-                const detail = `        ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || '-'} ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่ายตามรายการ ดังต่อไปนี้`;
-                const splitDetail = doc.splitTextToSize(detail, ctx.width - 15);
-                doc.text(splitDetail, ctx.x + 5, yPos);
-                yPos += (splitDetail.length * 7);
-
-                // ส่วนรายการเงิน (ตั้งกั้นหลังให้ตรงกันตามรูป)
-                const xUnit = ctx.x + ctx.width - 10;
-                const xNumber = xUnit - 5;
-                const xLabel = xNumber - 40;
-
-                doc.text(`1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '1'} เครื่อง`, ctx.x + 15, yPos);
-                doc.text("เป็นเงิน", xLabel, yPos);
-                doc.text(parseFloat(formValues.amount || 0).toLocaleString(), xNumber, yPos, { align: 'right' });
-                doc.text("บาท", xUnit, yPos);
-
-                yPos += 7;
-                doc.text("รวมเป็นเงิน", xLabel, yPos);
-                doc.text(formValues.total || '0.00', xNumber, yPos, { align: 'right' });
-                doc.text("บาท", xUnit, yPos);
-
-                // --- ส่วนลายเซ็น (จัดกึ่งกลางตามเส้นสีแดง) ---
-                yPos += 30; 
-                doc.text(`.......................................................`, centerX, yPos, { align: 'center' });
-                yPos += 8;
-                doc.text(`( นายสุทธิศักดิ์ สรรพสาร )`, centerX, yPos, { align: 'center' });
-                yPos += 7;
-                doc.text(`หผ.คข.กดส.ฉ.2`, centerX, yPos, { align: 'center' });
-                yPos += 7;
-                doc.text(`วันที่ .......................................................`, centerX, yPos, { align: 'center' });
-            }
-        }
+        columnStyles: { 
+            0: { cellWidth: 95 }, 
+            1: { cellWidth: 95 } 
+        },
+        rowStyles: { 0: { minCellHeight: 85 } },
+        theme: 'grid'
     });
 
-    // ส่วนการบันทึก/Upload
+    yPos = doc.lastAutoTable.finalY + 15;
+
+    // ===== MONEY DETAILS SECTION =====
+    doc.setFont("THSarabun", "bold");
+    doc.setFontSize(11);
+    doc.text("เรียน อก.ดส.ฉ.2", 15, yPos);
+    
+    yPos += 6;
+    doc.setFont("THSarabun", "normal");
+    doc.setFontSize(10);
+    const reasonText = `ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || 'ค่าซ่อม'} ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่าย ตามรายการ ดังต่อไปนี้`;
+    const splitReason = doc.splitTextToSize(reasonText, 180);
+    doc.text(splitReason, 15, yPos);
+    yPos += (splitReason.length * 4) + 4;
+
+    // Item line
+    doc.setFontSize(10);
+    doc.text(`1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '1'} เครื่อง`, 20, yPos);
+    yPos += 5;
+
+    // Money detail table
+    const xLeft = 75;
+    const xAmount = 165;
+    const xBaht = 190;
+
+    doc.text("( ราคาต่อหน่วย " + (formValues.amount || '0.00') + " บาท ไม่รวมภาษี )", 20, yPos);
+    doc.text("เป็นเงิน", xLeft, yPos);
+    doc.text(formValues.amount || '0.00', xAmount, yPos, { align: 'right' });
+    doc.text("บาท", xBaht, yPos);
+
+    yPos += 5;
+    doc.text("มูลค่าเพิ่ม");
+    doc.text("vat 7% เป็นเงิน", xLeft, yPos);
+    doc.text(formValues.vat || '0.00', xAmount, yPos, { align: 'right' });
+    doc.text("บาท", xBaht, yPos);
+
+    yPos += 5;
+    doc.setFont("THSarabun", "bold");
+    doc.text("รวมเป็นเงิน", xLeft, yPos);
+    doc.text(formValues.total || '0.00', xAmount, yPos, { align: 'right' });
+    doc.text("บาท", xBaht, yPos);
+
+    yPos += 8;
+    doc.setFont("THSarabun", "normal");
+    const finalText = `จึงเรียนมาเพื่อโปรดลงนามอนุมัติจ่ายเงินในใบสำคัญจ่ายเงินหมุนเวียนที่แนบมาพร้อมนี้จำนวน 1 ฉบับ
+รวมเป็นเงิน ${formValues.total || '0.00'} บาท (${formValues.totalText || '-'}) ต่อไปด้วย`;
+    const splitFinal = doc.splitTextToSize(finalText, 180);
+    doc.text(splitFinal, 15, yPos);
+
+    yPos += (splitFinal.length * 4) + 12;
+
+    // Signature
+    const sigX = 105;
+    doc.setFontSize(10);
+    doc.text("......................................", sigX, yPos, { align: 'center' });
+    yPos += 5;
+    doc.text("( นายสุทธิศักดิ์ สรรพสาร )", sigX, yPos, { align: 'center' });
+    yPos += 5;
+    doc.text("หผ.คข.กดส.ฉ.2", sigX, yPos, { align: 'center' });
+    yPos += 5;
+    doc.text("วันที่ .............................", sigX, yPos, { align: 'center' });
+
+    // ===== UPLOAD TO SERVER =====
     const pdfBlob = doc.output('blob');
     const fileName = `report_${apiData.repair_id}_${Date.now()}.pdf`;
     const formData = new FormData();
@@ -194,10 +243,10 @@ async function generateThaiPDF(formValues, apiData) {
 
     try {
         if (typeof API_BASE === 'undefined') {
-            throw new Error('API_BASE is not defined. Check if status_repair.html has it defined.');
+            throw new Error('API_BASE is not defined');
         }
 
-        console.log("Attempting to upload to:", `${API_BASE}/api/upload-report`);
+        console.log("Uploading to:", `${API_BASE}/api/upload-report`);
         
         const uploadRes = await fetch(`${API_BASE}/api/upload-report`, {
             method: 'POST',
@@ -231,12 +280,6 @@ async function generateThaiPDF(formValues, apiData) {
         }
     } catch (err) {
         console.error("Upload Error:", err);
-        console.error("Error details:", {
-            message: err.message,
-            api_base: typeof API_BASE !== 'undefined' ? API_BASE : 'NOT DEFINED',
-            repair_id: apiData.repair_id
-        });
-        Swal.fire('Error', `ไม่สามารถเชื่อมต่อ Server เพื่อบันทึกรายงานได้\n\nDetails: ${err.message}`, 'error');
+        Swal.fire('Error', `ไม่สามารถเชื่อมต่อ Server\n\nDetails: ${err.message}`, 'error');
     }
 }
-

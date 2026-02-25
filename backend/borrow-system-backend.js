@@ -976,7 +976,7 @@ app.get('/api/repair-status', (req, res) => {
             contract_number,
             employee_name, 
             employees_code AS employee_id, -- Alias เป็น employee_id
-            phone_number AS phone,          -- Alias เป็น phone
+            phone_number,                   -- ตรงกับ frontend
             affiliation AS department,     -- Alias เป็น department
             problem, 
             status, 

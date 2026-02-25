@@ -16,7 +16,6 @@
 
 <script src="THSarabun-Bold.js"></script>
 
-<script src="pdf-generator.js"></script>
     <style>       
         :root {
             --primary-color: #4361ee;
@@ -225,8 +224,11 @@
                     <tr>
                         <th>ลำดับ</th>
                         <th>ข้อมูลผู้แจ้ง</th>
+                        <th>รหัสพนักงาน</th>
+                        <th>เบอร์ติดต่อ</th>
                         <th>อุปกรณ์ / รุ่น</th>
                         <th>รหัส S/N</th>
+                        <th>เลขทรัพย์สิน</th>
                         <th>เลขที่สัญญา</th>
                         <th>อาการเสีย</th>
                         <th>ขั้นตอนการซ่อม</th>
@@ -243,9 +245,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="THSarabun-Bold.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script>
-        const API_BASE = "http://192.168.100.33:5000";
-
+        const API_BASE = "http://172.21.200.101:5000";
+    </script>
+    <script src="pdf-generator.js"></script>
+    <script>
         async function loadRepairData() {
             try {
                 const searchText = document.getElementById('search-input')?.value?.trim() || '';
@@ -269,7 +276,7 @@
     if (!repairs || repairs.length === 0) {
         body.innerHTML = `
             <tr>
-                <td colspan="11" class="text-center text-muted py-4">ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา</td>
+                <td colspan="14" class="text-center text-muted py-4">ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา</td>
             </tr>
         `;
         return;
@@ -345,8 +352,11 @@ if (repair.status === 'Pending') {
                     <div class="fw-bold">${repair.employee_name || 'ไม่ระบุ'}</div>
                     <div class="text-muted small">${repair.department || '-'}</div>
                 </td>
+                <td><code class="sn-code">${repair.employee_id || '-'}</code></td>
+                <td><code class="sn-code">${repair.phone_number || '-'}</code></td>
                 <td><div class="fw-medium text-dark">${repair.brand || '-'}</div></td>
                 <td><code class="sn-code">${repair.serial_number || '-'}</code></td>
+                <td><code class="sn-code">${repair.asset_number || '-'}</code></td>
                 <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
                 <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
                 <td><div class="text-truncate" style="max-width: 150px;" title="${repair.Procedure || '-'}">${repair.Procedure || '-'}</div></td>
@@ -410,7 +420,7 @@ async function finishRepair(repairId, itemId, repairData) {
         if (typeof handleFinishAndGeneratePDF === 'function') {
             handleFinishAndGeneratePDF(finalData);
         } else {
-            console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator.js");
+            console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator-new.js");
             Swal.fire('Error', 'ไม่สามารถเรียกใช้ระบบสร้าง PDF ได้', 'error');
         }
     }

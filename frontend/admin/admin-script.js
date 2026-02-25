@@ -12,7 +12,7 @@ let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
-const SERVER_IP = "192.168.100.33";
+const SERVER_IP = "172.21.200.101";
 
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
