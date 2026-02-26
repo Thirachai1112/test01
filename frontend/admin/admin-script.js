@@ -32,7 +32,7 @@ function displayInventory(data) {
                 ? `http://localhost:5000/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
-            //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
+            //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)ด
             const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
 
             listElement.innerHTML += `

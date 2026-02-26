@@ -249,7 +249,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script>
-        const API_BASE = "http://172.21.200.101:5000";
+        const API_BASE = "http://127.0.0.1:5000";
     </script>
     <script src="pdf-generator.js"></script>
     <script>
@@ -420,7 +420,7 @@ async function finishRepair(repairId, itemId, repairData) {
         if (typeof handleFinishAndGeneratePDF === 'function') {
             handleFinishAndGeneratePDF(finalData);
         } else {
-            console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator-new.js");
+            console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator.js");
             Swal.fire('Error', 'ไม่สามารถเรียกใช้ระบบสร้าง PDF ได้', 'error');
         }
     }
