@@ -30,7 +30,7 @@
             </div>
 
             <div class="flex items-right space-x-2">
-                <a href="http://127.0.0.1:5500/Default.html"
+                <a href="/Default.html"
                     class="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 py-2 px-5 rounded-lg backdrop-blur-sm transition duration-300 text-sm font-medium">
                     <i class="fas fa-home text-xs"></i>
                     <span>กลับหน้าหลัก</span>
@@ -202,8 +202,6 @@ async function submitRepairForm(event) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
-        const SERVER_IP = window.location.hostname;
-
         Swal.fire({
             title: 'กำลังส่งข้อมูล...',
             text: 'กรุณารอสักครู่',
@@ -213,7 +211,7 @@ async function submitRepairForm(event) {
             }
         });
 
-        const response = await fetch(`http://${SERVER_IP}:5000/api/repair`, {
+        const response = await fetch('/api/repair', {
             method: 'POST',
             body: formData,
         });

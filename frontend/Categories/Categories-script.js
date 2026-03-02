@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000';
+const API_BASE = window.location.origin;
 let allItems = [];
 let filteredItems = [];
 let currentFilter = 'all';
@@ -59,7 +59,7 @@ function createItemCard(item) {
 
     const imageUrl = item.image_url 
         ? `${API_BASE}/uploads/${item.image_url}`
-        : 'https://via.placeholder.com/280x200?text=No+Image';
+        : `${API_BASE}/no-image.svg`;
 
     const statusClass = {
         'Available': 'status-available',
@@ -72,7 +72,7 @@ function createItemCard(item) {
     }[item.status] || item.status;
 
     card.innerHTML = `
-        <img src="${imageUrl}" alt="${item.item_name}" class="item-image" onerror="this.src='https://via.placeholder.com/280x200?text=No+Image'">
+        <img src="${imageUrl}" alt="${item.item_name}" class="item-image" onerror="this.src='${API_BASE}/no-image.svg'">
         <div class="item-content">
             <div class="category-badge">${item.cat_name || 'ไม่ระบุหมวดหมู่'}</div>
             <div class="item-title">${item.item_name}</div>
@@ -104,7 +104,7 @@ function showItemDetails(item) {
 
     const imageUrl = item.image_url 
         ? `${API_BASE}/uploads/${item.image_url}`
-        : 'https://via.placeholder.com/600x300?text=No+Image';
+        : `${API_BASE}/no-image.svg`;
 
     const statusClass = {
         'Available': 'status-available',
@@ -117,7 +117,7 @@ function showItemDetails(item) {
     }[item.status] || item.status;
 
     modalBody.innerHTML = `
-        <img src="${imageUrl}" alt="${item.item_name}" class="modal-image" onerror="this.src='https://via.placeholder.com/600x300?text=No+Image'">
+        <img src="${imageUrl}" alt="${item.item_name}" class="modal-image" onerror="this.src='${API_BASE}/no-image.svg'">
         <div class="modal-details">
             <div class="modal-detail-row">
                 <div class="modal-detail-label">ชื่ออุปกรณ์:</div>

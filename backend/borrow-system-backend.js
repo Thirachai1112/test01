@@ -17,11 +17,13 @@ const storage = multer.diskStorage({
 
         // ใช้ req.originalUrl เพื่อดู URL เต็มที่เรียกเข้ามา
         if (req.originalUrl.includes('repair')) {
-            folder = 'uploads/repairs';
+            folder = path.join(__dirname, 'uploads', 'repairs');
         } else if (req.originalUrl.includes('borrow')) {
-            folder = 'uploads/borrowing';
+            folder = path.join(__dirname, 'uploads', 'borrowing');
         } else if (req.originalUrl.includes('report')) {
-            folder = 'uploads/reports';
+            folder = path.join(__dirname, 'uploads', 'reports');
+        } else {
+            folder = path.join(__dirname, 'uploads');
         }
 
         // ตรวจสอบและสร้างโฟลเดอร์อัตโนมัติ
@@ -49,13 +51,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '..')));
 app.use(express.static(__dirname));
 
+const hasExistingImage = (fileName) => {
+    if (!fileName) return null;
+    const fullPath = path.join(__dirname, 'uploads', fileName);
+    return fs.existsSync(fullPath);
+};
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'Default.html'));
+});
+
+const DB_HOST = process.env.DB_HOST || '127.0.0.1';
+const DB_PORT = Number(process.env.DB_PORT) || 3306;
+const DB_USER = process.env.DB_USER || 'root';
+const DB_PASSWORD = process.env.DB_PASSWORD || 'password123';
+const DB_NAME = process.env.DB_NAME || 'my_database';
+
 const db = mysql.createPool({
-    host: 'localhost',
-    user: 'root',      // ใส่ user ของคุณ
-    password: 'password123',      // ใส่ password ของคุณ
-    database: 'my_database', // เปลี่ยนเป็นชื่อ DB ที่คุณตั้ง
+    host: DB_HOST,
+    port: DB_PORT,
+    user: DB_USER,
+    password: DB_PASSWORD,
+    database: DB_NAME,
     waitForConnections: true,
     connectionLimit: 10
 });
@@ -99,8 +119,14 @@ app.get('/items', (req, res) => {
 
         db.query(sql, [...searchParams, limit, offset], (err, results) => {
             if (err) return res.status(500).json({ error: "Select SQL Error", details: err });
+
+            const safeResults = results.map(item => ({
+                ...item,
+                image_url: hasExistingImage(item.image_url) ? item.image_url : null
+            }));
+
             res.json({
-                items: results,
+                items: safeResults,
                 pagination: { totalItems, totalPages, currentPage: page }
             });
         });
@@ -174,10 +200,12 @@ app.get('/items', (req, res) => {
     db.query(sql, (err, results) => {
         if (err) return res.status(500).json(err);
 
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
         // ปรับแต่ง URL รูปภาพให้สมบูรณ์ เพื่อให้ Frontend นำไปใช้ได้ทันที
         const updatedResults = results.map(item => ({
             ...item,
-            image_url: `http://localhost:5000/uploads/${item.image_url}`
+            image_url: hasExistingImage(item.image_url) ? `${baseUrl}/uploads/${item.image_url}` : null
         }));
 
         res.json(updatedResults);
@@ -1194,8 +1222,8 @@ app.get('/api/repair-items', (req, res) => {
     });
 });
 
-const PORT = 5000;
-console.log('Server is running on port 5000');
+const PORT = Number(process.env.PORT) || 5000;
+console.log(`Preparing server on port ${PORT}`);
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
