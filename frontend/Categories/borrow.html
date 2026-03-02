@@ -262,7 +262,7 @@
                     <i class="fas fa-arrow-left"></i>
                     กลับหน้ารายการอุปกรณ์
                 </a>
-                <a class="btn btn-primary" href="http://127.0.0.1:5500/Default.html">
+                <a class="btn btn-primary" href="/Default.html">
                     <i class="fas fa-home"></i>
                     กลับหน้าหลัก
                 </a>
@@ -327,7 +327,7 @@
     </div>
 
     <script>
-        const API_BASE = `http://${window.location.hostname}:5000`;
+        const API_BASE = window.location.origin;
         const form = document.getElementById('borrowForm');
         const messageBox = document.getElementById('formMessage');
 

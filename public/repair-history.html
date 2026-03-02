@@ -186,6 +186,7 @@
         let repairLogsPerPage = 10;
         let allRepairLogs = [];
         let filteredRepairLogs = [];
+        const API_BASE = window.location.origin;
 
         // เมื่อ Load หน้า ให้ดึงข้อมูล
         window.addEventListener('DOMContentLoaded', () => {
@@ -201,7 +202,7 @@
 
         function loadRepairHistory(page = 1) {
             const searchTerm = document.getElementById('search-input')?.value || '';
-            const url = `http://localhost:5000/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${encodeURIComponent(searchTerm)}`;
+            const url = `${API_BASE}/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${encodeURIComponent(searchTerm)}`;
             
             fetch(url)
                 .then(res => res.json())
@@ -235,7 +236,7 @@
                 if (repair.file_paths && repair.file_paths.length > 0) {
                     repair.file_paths.forEach(filePath => {
                         const fileName = filePath.split('/').pop();
-                        fileBadges += `<a href="http://localhost:5000/${filePath}" class="badge badge-info" download>
+                        fileBadges += `<a href="${API_BASE}/${filePath}" class="badge badge-info" download>
                             <i class="fas fa-download"></i> ${fileName.substring(0, 12)}...
                         </a> `;
                     });

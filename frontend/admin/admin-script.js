@@ -12,7 +12,7 @@ let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
-const SERVER_IP = "192.168.100.33";
+const API_BASE = window.location.origin;
 
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
@@ -29,11 +29,11 @@ function displayInventory(data) {
     if (data.items && data.items.length > 0) {
         data.items.forEach(item => {
             const fullImageUrl = item.image_url
-                ? `http://localhost:5000/uploads/${item.image_url}`
+                ? `${API_BASE}/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
-            //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)
-            const qrUrl = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+            //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)ด
+            const qrUrl = `${API_BASE}/qrcodes/qr_${item.item_id}.png`;
 
             listElement.innerHTML += `
                 <tr>
@@ -110,7 +110,7 @@ function searchBorrowingLogs() {
 async function loadBorrowingLogs(page = 1) {
     currentLogsPage = page;
     try {
-        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const response = await fetch(`${API_BASE}/borrowing-logs`);
         const data = await response.json();
         allBorrowingLogs = data.logs || [];
         filteredLogs = allBorrowingLogs;
@@ -146,7 +146,7 @@ function displayBorrowingLogs(logs, page) {
             let filesHtml = '';
             if (log.file_paths && log.file_paths.length > 0) {
                 log.file_paths.forEach(path => {
-                    const fileUrl = `http://localhost:5000${path}`; // ตรวจสอบ Port ให้ตรงกับ Backend
+                    const fileUrl = `${API_BASE}${path}`;
                     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(path);
 
                     if (isImage) {
@@ -214,7 +214,7 @@ function renderLogsPagination(totalPages, currentPage) {
 // ฟังก์ชันอัปเดตสรุปข้อมูล (เรียกเมื่อเพิ่ม/ลบ)
 async function updateDashboardStats() {
     try {
-        const response = await fetch(`http://localhost:5000/items?page=1&limit=999`);
+        const response = await fetch(`${API_BASE}/items?page=1&limit=999`);
         const data = await response.json();
         const allItems = data.items || [];
 
@@ -223,7 +223,7 @@ async function updateDashboardStats() {
         const borrowedCount = allItems.filter(i => i.status === 'Borrowed').length;
         
         // ดึงข้อมูลจำนวนอุปกรณ์ที่นำไปซ่อม จากตาราง item_repair
-        const repairResponse = await fetch(`http://localhost:5000/api/repair-items`);
+        const repairResponse = await fetch(`${API_BASE}/api/repair-items`);
         const repairData = await repairResponse.json();
         const repairCount = repairData.success ? repairData.data.length : 0;
 
@@ -262,7 +262,7 @@ async function updateDashboardStats() {
 async function loadInventory(page = 1, search = '') {
     currentPage = page;
     try {
-        const response = await fetch(`http://localhost:5000/items?page=${page}&limit=6&search=${encodeURIComponent(search)}`);
+        const response = await fetch(`${API_BASE}/items?page=${page}&limit=6&search=${encodeURIComponent(search)}`);
         const data = await response.json();
 
         // ✅ เก็บข้อมูลลงในตัวแปร global เพื่อใช้ในการแก้ไขโดยไม่ต้องดึง API รายชิ้นที่พังอยู่
@@ -285,7 +285,7 @@ async function loadInventory(page = 1, search = '') {
 // async function updateDashboardNumbers() {
 //     try {
 //         // ดึงข้อมูลทั้งหมดแบบไม่แบ่งหน้าเพื่อมานับสรุป
-//         const response = await fetch(`http://localhost:5000/items?limit=999`); 
+//         const response = await fetch(`${API_BASE}/items?limit=999`); 
 //         const data = await response.json();
 //         const items = data.items;
 
@@ -324,7 +324,7 @@ async function deleteItem(id) {
                 didOpen: () => Swal.showLoading()
             });
 
-            const response = await fetch(`http://localhost:5000/delete-item/${id}`, {
+            const response = await fetch(`${API_BASE}/delete-item/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
@@ -412,7 +412,7 @@ async function saveItem(event) {
             formData.append('image', imageInput.files[0]);
         }
 
-        const response = await fetch(`http://${SERVER_IP}:5000/add-item`, {
+        const response = await fetch(`${API_BASE}/add-item`, {
             method: 'POST',
             body: formData
         });
@@ -427,10 +427,10 @@ async function saveItem(event) {
                 html: `
                     <div class="text-center">
                         <p>สร้าง QR Code สำหรับอุปกรณ์เรียบร้อยแล้ว</p>
-                        <img src="http://${SERVER_IP}:5000${data.qr_url}" 
+                        <img src="${API_BASE}${data.qr_url}" 
                              style="width:200px; height:200px; border:1px solid #ddd; padding:10px; margin:10px 0;">
                         <br>
-                        <a href="http://${SERVER_IP}:5000${data.qr_url}" download class="btn btn-primary btn-sm">
+                        <a href="${API_BASE}${data.qr_url}" download class="btn btn-primary btn-sm">
                             <i class="fas fa-download"></i> ดาวน์โหลดภาพ QR
                         </a>
                     </div>
@@ -472,14 +472,14 @@ function editItem(id) {
         const previewImg = document.getElementById('edit_preview');
         if (previewImg) {
             previewImg.src = item.image_url
-                ? `http://localhost:5000/uploads/${item.image_url}`
+                ? `${API_BASE}/uploads/${item.image_url}`
                 : "https://via.placeholder.com/150";
         }
 
         const qrPreviewImg = document.getElementById('edit_qr_preview');
         if (qrPreviewImg) {
             // ดึงรูปจากโฟลเดอร์ qrcodes ของ Server
-            qrPreviewImg.src = `http://${SERVER_IP}:5000/qrcodes/qr_${item.item_id}.png`;
+            qrPreviewImg.src = `${API_BASE}/qrcodes/qr_${item.item_id}.png`;
 
             // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
             qrPreviewImg.onerror = function () {
@@ -526,7 +526,7 @@ function openEditModal(itemId) {
         const previewImg = document.getElementById('edit_preview');
         if (previewImg) {
             previewImg.src = item.image_url
-                ? `http://localhost:5000/uploads/${item.image_url}`
+                ? `${API_BASE}/uploads/${item.image_url}`
                 : "https://via.placeholder.com/150";
         }
 
@@ -559,7 +559,7 @@ async function updateItem() {
     try {
         Swal.fire({ title: 'กำลังอัปเดต...', didOpen: () => Swal.showLoading() });
 
-        const response = await fetch(`http://localhost:5000/update-item-all/${itemId}`, {
+        const response = await fetch(`${API_BASE}/update-item-all/${itemId}`, {
             method: 'PUT',
             body: formData
         });
@@ -640,7 +640,7 @@ function logout() {
         if (result.isConfirmed) {
             localStorage.removeItem('adminToken');
             localStorage.removeItem('adminUser');
-            window.location.href = 'http://127.0.0.1:5500/login.html';
+            window.location.href = '/login.html';
         }
     });
 }
@@ -649,7 +649,7 @@ function logout() {
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-        window.location.href = 'login.html';
+        window.location.href = '/login.html';
         return;
     }
 
@@ -681,7 +681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function loadRepairLogs(page = 1) {
     const searchTerm = document.getElementById('repair-search')?.value || '';
-    const url = `http://localhost:5000/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${searchTerm}`;
+    const url = `${API_BASE}/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${searchTerm}`;
 
     fetch(url)
         .then(res => res.json())
@@ -746,9 +746,9 @@ function displayRepairLogs(repairs) {
                     ? cleanName
                     : `uploads/repairs/${cleanName}`;
 
-                // 3. สร้าง URL เต็ม โดยใช้ SERVER_IP แทน localhost (เพื่อให้มือถือหรือเครื่องอื่นเปิดได้ด้วย)
+                // 3. สร้าง URL เต็มจากโดเมนปัจจุบัน
                 // และลบสแลชซ้ำซ้อนด้วย Regex อีกชั้นเพื่อความชัวร์
-                let fullUrl = `http://${SERVER_IP}:5000/${finalPath}`.replace(/([^:]\/)\/+/g, "$1");
+                let fullUrl = `${API_BASE}/${finalPath}`.replace(/([^:]\/)\/+/g, "$1");
 
                 return `<a href="${fullUrl}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 me-1">
                 <i class="fas fa-image"></i>
@@ -779,7 +779,7 @@ function displayRepairLogs(repairs) {
 
 async function updateRepairStatusCount() {
     try {
-        const res = await fetch(`http://localhost:5000/api/repair-status`);
+        const res = await fetch(`${API_BASE}/api/repair-status`);
         const result = await res.json();
 
         const countElement = document.getElementById('total-repair-status');
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ฟังก์ชันดึงยอดรวมงานค้างซ่อมไปโชว์ที่ Dashboard
 async function syncRepairDashboard() {
     try {
-        const res = await fetch(`http://localhost:5000/api/repair-management`);
+        const res = await fetch(`${API_BASE}/api/repair-management`);
         const result = await res.json();
         const countEl = document.getElementById('total-repair-status');
 
@@ -837,7 +837,7 @@ function displayRepairPagination(pagination) {
 async function loadRecentBorrows() {
     try {
         // ใช้ Endpoint เดียวกับหน้าประวัติการยืมที่คุณมี
-        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const response = await fetch(`${API_BASE}/borrowing-logs`);
         const data = await response.json();
         const logs = data.logs || [];
         
@@ -937,7 +937,7 @@ function renderDeviceChart() {
 // ฟังก์ชันแสดงรายละเอียดการยืม
 async function showBorrowDetail(logId) {
     try {
-        const response = await fetch(`http://localhost:5000/borrowing-logs`);
+        const response = await fetch(`${API_BASE}/borrowing-logs`);
         const data = await response.json();
         const log = data.logs.find(l => l.log_id === logId);
         
