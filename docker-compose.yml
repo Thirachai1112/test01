@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: mysql:8.0
@@ -13,6 +12,28 @@ services:
       - "3306:3306"                    # Map port ออกมาให้ DBeaver เข้าถึงได้
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    image: node:20-alpine
+    container_name: borrow_system_backend
+    restart: always
+    working_dir: /app/backend
+    command: sh -c "npm install && npm start"
+    env_file:
+      - ./backend/.env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./:/app
 
 volumes:
   mysql_data:
