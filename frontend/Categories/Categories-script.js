@@ -125,7 +125,7 @@ function showItemDetails(item) {
             </div>
             <div class="modal-detail-row">
                 <div class="modal-detail-label">หมวดหมู่:</div>
-                <div class="modal-detail-value">${item.cat_name || '-'}</div>
+                <div class="modal-detail-value">${item.item_type || '-'}</div>
             </div>
             <div class="modal-detail-row">
                 <div class="modal-detail-label">Serial Number:</div>

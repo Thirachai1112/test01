@@ -74,6 +74,14 @@ NODE_ENV=development
 
 ⚠️ **ความสำคัญ:** ไม่ให้ commit ไฟล์ `.env` ขึ้น repository
 
+### Environment Profiles (แยก Local / Docker)
+
+- Local development (รัน `npm start` ใน `backend`): ใช้ `backend/.env` หรือ `backend/.env.local`
+- Docker backend (รันผ่าน `docker compose`): ใช้ `backend/.env.docker`
+- ตัวอย่างไฟล์สำหรับทีม:
+   - `backend/.env.example` (local)
+   - `backend/.env.docker.example` (docker)
+
 ### ขั้นตอนที่ 4: ตั้งค่าฐานข้อมูล
 
 #### 4.1 สร้างฐานข้อมูล MySQL:

@@ -32,9 +32,6 @@ function displayInventory(data) {
                 ? `${API_BASE}/uploads/${item.image_url}`
                 : 'https://via.placeholder.com/50';
 
-            //สร้าง Path สำหรับดึงรูป QR Code (ชื่อไฟล์ตามที่ Backend เจนไว้)ด
-            const qrUrl = `${API_BASE}/qrcodes/qr_${item.item_id}.png`;
-
             listElement.innerHTML += `
                 <tr>
                     <td class="text-center">
@@ -52,7 +49,7 @@ function displayInventory(data) {
                         </span>
                     </td>
 <td class="text-center">
-                        <button class="btn btn-sm btn-outline-dark" onclick="showQR('${qrUrl}', '${item.item_name}')">
+                        <button class="btn btn-sm btn-outline-dark" onclick="showQR(${item.item_id}, '${item.item_name}')">
                             <i class="fas fa-qrcode"></i>
                         </button>
                     </td>
@@ -76,9 +73,23 @@ function displayInventory(data) {
 }
 
 
-function showQR(qrUrl, itemName) {
+async function showQR(itemId, itemName) {
     const qrImage = document.getElementById('qrDisplayImage');
     const downloadBtn = document.getElementById('qrDownloadBtn');
+
+    let qrUrl = `${API_BASE}/qrcodes/qr_${itemId}.png`;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/qrcode/${itemId}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data?.success && data?.qr_url) {
+                qrUrl = `${API_BASE}${data.qr_url}`;
+            }
+        }
+    } catch (error) {
+        console.warn('QR API fallback to static path:', error);
+    }
 
     qrImage.src = qrUrl;
     downloadBtn.href = qrUrl;
@@ -478,8 +489,17 @@ function editItem(id) {
 
         const qrPreviewImg = document.getElementById('edit_qr_preview');
         if (qrPreviewImg) {
-            // ดึงรูปจากโฟลเดอร์ qrcodes ของ Server
             qrPreviewImg.src = `${API_BASE}/qrcodes/qr_${item.item_id}.png`;
+
+            fetch(`${API_BASE}/api/qrcode/${item.item_id}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (data?.success && data?.qr_url) {
+                        qrPreviewImg.src = `${API_BASE}${data.qr_url}`;
+                    }
+                })
+                .catch(() => {
+                });
 
             // ถ้ายังไม่มีรูป QR ให้โชว์ Placeholder
             qrPreviewImg.onerror = function () {
@@ -879,7 +899,6 @@ function renderDeviceChart() {
 
     const available = parseInt(document.getElementById('total-available').innerText) || 0;
     const borrowed = parseInt(document.getElementById('total-borrowed').innerText) || 0;
-    const totalItems = parseInt(document.getElementById('total-items').innerText) || 0;
     const statusRepair = parseInt(document.getElementById('total-repair-status').innerText) || 0;
 
     if (deviceChart) deviceChart.destroy();
@@ -887,10 +906,10 @@ function renderDeviceChart() {
     deviceChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['ว่าง','ยืมอยู่', 'ซ่อม'],
+            labels: ['ว่าง','ซ่อม', 'ยืมอยู่'],
             datasets: [{
-                data: [available, totalItems - available - borrowed, borrowed, statusRepair],
-                backgroundColor: ['#0C7779', '#e79316', '#E5BA41', '#EA7B7B'],
+                data: [available ,statusRepair, borrowed],
+                backgroundColor: ['#0C7779',  '#EA7B7B', '#E5BA41'],
                 borderWidth: 0,
                 hoverOffset: 15 // เพิ่ม Effect เวลาเอาเมาส์ชี้
             }]

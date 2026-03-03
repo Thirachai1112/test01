@@ -179,7 +179,7 @@ async function generateThaiPDF(formValues, apiData) {
         body: [
             [/* แถวที่ 1: ส่วนบนซ้าย/ขวา */],
             [/* แถวที่ 2: ส่วนอนุมัติ */],
-            [{ content: '', colSpan: 2, styles: { minCellHeight: 140 } }] // แถวที่ 3 ที่คุณต้องการ
+            [{ content: '', colSpan: 2, styles: { minCellHeight: 50 } }] // แถวที่ 3 ที่คุณต้องการ
         ],
         columnStyles: {
             0: { cellWidth: 90 }, // รวมกันได้ 180 (A4 กว้าง 210 - margin 30 = 180)
@@ -292,120 +292,121 @@ async function generateThaiPDF(formValues, apiData) {
 }
 async function generateThaiPDF(formValues, apiData) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const centerSpace = ' '.repeat(25); // ใช้สำหรับเว้นวรรคตรงกลางใน introText2
-
-    // 1. ตรวจสอบว่ามีตัวแปร font (จากไฟล์ THSarabun-Bold.js) หรือไม่
+    // กำหนด A4 แนวตั้ง
+    const doc = new jsPDF('p', 'mm', 'a4'); 
+    
+    // 1. ตั้งค่า Font และตรวจสอบ
     if (typeof font === 'undefined') {
-        Swal.fire('Error', 'ไม่พบข้อมูลฟอนต์ในระบบ (font variable not found)', 'error');
+        Swal.fire('Error', 'ไม่พบข้อมูลฟอนต์ในระบบ', 'error');
         return;
     }
-
-    // ตั้งค่าฟอนต์
     doc.addFileToVFS("THSarabun-Bold.ttf", font);
+    doc.addFont("THSarabun-Bold.ttf", "THSarabun", "normal");
     doc.addFont("THSarabun-Bold.ttf", "THSarabun", "bold");
     doc.setFont("THSarabun", "bold");
 
-    doc.setFontSize(20);
-    doc.text("การไฟฟ้าส่วนภูมิภาค", 105, 15, { align: 'center' });
+    // 2. ส่วนหัวกระดาษ (บีบระยะ Y ลงมาเพื่อเพิ่มพื้นที่ด้านล่าง)
     doc.setFontSize(16);
-    doc.text("รายงานขอซื้อ/ขอจ้าง และอนุมัติดำเนินการสั่งจ้าง", 105, 22, { align: 'center' });
-    doc.setFontSize(16);
-    doc.text("เลขที่ ฉ.2กดส.(ผคข.)                 /2569", 105, 29, { align: 'center' });
+    doc.text("การไฟฟ้าส่วนภูมิภาค", 105, 10, { align: 'center' });
+    doc.setFontSize(14);
+    doc.text("รายงานขอซื้อ/ขอจ้าง และอนุมัติดำเนินการสั่งจ้าง", 105, 16, { align: 'center' });
+    doc.text(`เลขที่ ฉ.2กดส.(ผคข.)                /2569`, 105, 22, { align: 'center' });
 
+    // เตรียม Format ตัวเลข
+    const amountVal = parseFloat(formValues.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const vatVal = formValues.vat || '0.00';
+    const totalVal = formValues.total || '0.00';
 
-    const introText = `เรียน หผ.คข.กดส.ฉ.2
-       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ดำเนินการ โดยวิธีเฉพาะเจาะจงตามรายการ ดังนี้
-1. ค่าซ่อมเครื่อง ${apiData.brand || '-'} สัญญาเลขที่ ${apiData.contract_number || '-'} อาการ (${apiData.problem || 'รอระบุอาการ'}) serial number ${apiData.serial_number || '-'} ตามอนุมัติเลขที่ ${formValues.approveId} ลงวันที่ ${formValues.date}
-2. เบิกจ่ายจากรหัสบัญชี 53051060 ศูนย์ต้นทุน E301023000 วงเงิน ${formValues.paymentDetails} บาท (ราคารวมภาษีมูลค่าเพิ่ม) โดยมีคณะกรรมการตรวจรับตามคำสั่ง เลขที่ ฉ.2 กดส.(พ.)01/2569 ลงวันที่ 5 มกราคม 2569
-เป็นผู้ตรวจรับการจัดซ่อม/จัดซจ้าง ในวาระนี้.- \n\n\n\n\n\n\n\n\n\n\n
-${centerSpace}...................................
-${centerSpace}${formValues.inspector || ''}
-${centerSpace}${formValues.position || ''}
-${centerSpace}วันที่ ..........................`;
-    const introText2 = `เรียน อก.ดส.ฉ.2
-       เพื่อโปรดเห็นชอบรายงานขอจัดซื้อดำเนินการตาม
-รายการดังกล่าวข้างต้นต่อไป \n\n\n\n\n
-${centerSpace}............................................
-${centerSpace}( นายสุทธิศักดิ์ สรรพสาร )
-${centerSpace}หผ.คข.กดส.ฉ.2
-${centerSpace}วันที่ ....................................`;
-
-    const introText3 = `       เห็นชอบรายงานขอซื้อ/ขอจ้าง และอนุมัติสั่งซื้อ/สั่งจ้าง 
-ดำเนินการได็โดยปฏิบัติให้ถูกต้องตามระเบียบ \n\n\n
-${centerSpace}............................................
-${centerSpace}(...........................................)
-${centerSpace}............................................
-${centerSpace}วันที่ ....................................
-
-
-
-`;
-
-    const introTex4 = `เรียน อก.ดส.ฉ.2
-        ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || `-`} ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่ายตามรายการ ดังต่อไปนี้
-        1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '-'} เครื่อง                                                  เป็นเงิน       ${formValues.amount || '-'} บาท
-                ( ราคาต่อหน่วย ${formValues.amount || '-'} บาท ไม่รวมภาษีมูลค่าเพิ่ม )     vat 7%                                เป็นเงิน       ${formValues.vat || `-`}   บาท
-                                                                                                                      รวมเป็นเงิน       ${formValues.total || '-'}  บาท
-
-            จึเรียนมาเพื่อโปรดลงนามอนุมัติจ่ายเงินในใบสำคัญจ่ายเงินหมุนเวียนที่แนบมาพร้อมนี้ดจำนวน                  1              ฉบับ
-รวมเป็นเงิน   ${formValues.total || '-'}   บาท  (${formValues.totalText || '-'})  ต่อไปด้วย \n\n
-                                            ${centerSpace}............................................
-                                            ${centerSpace}( นายสุทธิศักดิ์ สรรพสาร )
-                                            ${centerSpace}หผ.คข.กดส.ฉ.2
-                                            ${centerSpace}วันที่ ....................................`;
+    // 3. สร้างตารางเดียวที่คุมเนื้อหาทั้งหมด
     doc.autoTable({
-        startY: 30,
+        startY: 26,
+        theme: 'grid',
+        margin: { left: 15, right: 15, bottom: 5 }, // ลด margin ล่างสุด
+        pageBreak: 'avoid',
+        rowPageBreak: 'avoid',
         body: [
-            [introText, introText2],
-            ['', introText3],
-            [introTex4]
+            // ส่วนที่ 1: หัวรายงาน (เรียน หผ. / เรียน อก.)
+            [
+                `เรียน หผ.คข.กดส.ฉ.2\n       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง...`, 
+                `เรียน อก.ดย.ฉ.2\nเพื่อโปรดเห็นชอบรายงานขอจัดซื้อดำเนินการตามรายการดังกล่าวข้างต้นต่อไป`,
+                ''
+            ],
+            [
+                '', 
+                `       เห็นชอบรายงานขอซื้อ/ขอจ้าง และอนุมัติสั่งซื้อ/สั่งจ้างดำเนินการได้โดยปฏิบัติให้ถูกต้องตามระเบียบ`, 
+                ''
+            ],
+            // ส่วนที่ 2: เนื้อหาหลัก
+            [
+                `เรียน อก.ดย.ฉ.2\n       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || '-'} ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่ายตามรายการ ดังต่อไปนี้`,
+                '',
+                ''
+            ],
+            // ส่วนที่ 3: รายการเงิน (กั้นหลังตรงเป๊ะตามภาพ)
+            [`1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '1'} เครื่อง`, `เป็นเงิน   ${amountVal}`, 'บาท'],
+            [`       ( ราคาต่อหน่วย ${amountVal} บาท ไม่รวมภาษีมูลค่าเพิ่ม )     vat 7%`, `เป็นเงิน   ${vatVal}`, 'บาท'],
+            ['', `รวมเป็นเงิน   ${totalVal}`, 'บาท'],
+            [`รวมเป็นเงิน (ตัวอักษร)   ${formValues.totalText || '-'}`, '', 'บาท'],
+            // ส่วนที่ 4: ลายเซ็นท้ายตาราง (บีบระยะบรรทัดในก้อนเดียว)
+            [
+                `       จึงเรียนมาเพื่อโปรดลงนามอนุมัติจ่ายเงินในใบสำคัญจ่ายเงินหมุนเวียนที่แนบมาพร้อมนี้จำนวน 1 ฉบับ รวมเป็นเงิน ${totalVal} บาท ต่อไปด้วย\n\n                    ............................................\n                    ( นายสุทธิศักดิ์ สรรพสาร )\n                    หผ.คข.กดส.ฉ.2\n                    วันที่ ....................................`,
+                '',
+                ''
+            ]
         ],
         didParseCell: function (data) {
-            if (data.column.index === 0 && data.row.index === 0) data.cell.rowSpan = 2;
-            if (data.row.index === 2 && data.column.index === 0) {
-                data.cell.colSpan = 2;
-                data.cell.styles.halign = 'left';
-            }
+            const rowIndex = data.row.index;
+            const colIndex = data.column.index;
+
+            // การ Merge เซลล์
+            if (rowIndex === 0 && colIndex === 0) data.cell.rowSpan = 2; // ฝั่งซ้าย
+            if (rowIndex === 0 && colIndex === 1) data.cell.colSpan = 2; // ฝั่งขวาบน
+            if (rowIndex === 1 && colIndex === 1) data.cell.colSpan = 2; // ฝั่งขวาล่าง
+            if (rowIndex === 2 || rowIndex === 7) data.cell.colSpan = 3; // แถวเนื้อหาและลายเซ็นขยายเต็ม
+            if (rowIndex === 6 && colIndex === 0) data.cell.colSpan = 2; // แถวตัวอักษร
         },
         styles: {
-            font: 'THSarabun', fontSize: 14, lineColor: [0, 0, 0], lineWidth: 0.1, cellPadding: 3, overflow: 'linebreak', // สำคัญ: เพื่อให้ \n ทำงาน
-            halign: 'left', valign: 'top'
+            font: 'THSarabun', 
+            fontSize: 12, // ลดขนาดตัวอักษรเพื่อให้จบในหน้าเดียว
+            lineColor: [0, 0, 0], 
+            lineWidth: 0.1, 
+            cellPadding: 0.9, // ลด Padding เพื่อให้บรรทัดชิดกันขึ้น
+            overflow: 'linebreak',
+            valign: 'top'
         },
-        columnStyles: { 0: { cellWidth: 95 }, 1: { cellWidth: 95 } },
-        rowStyles: { 0: { minCellHeight: 120 }, 1: { minCellHeight: 15 }, 2: { minCellHeight: 25 } },
-        theme: 'grid'
+        rowStyles: {
+            0: { minCellHeight: 26 },
+            1: { minCellHeight: 14 },
+            2: { minCellHeight: 12 },
+            3: { minCellHeight: 9 },
+            4: { minCellHeight: 9 },
+            5: { minCellHeight: 9 },
+            6: { minCellHeight: 9 },
+            7: { minCellHeight: 26 }
+        },
+        columnStyles: { 
+            0: { cellWidth: 100 },               // คอลัมน์ข้อความ
+            1: { cellWidth: 40, halign: 'right' }, // คอลัมน์ตัวเลข (ชิดขวา)
+            2: { cellWidth: 15, halign: 'center' } // คอลัมน์หน่วย "บาท"
+        }
     });
 
-    // --- ส่วนการ Upload ไฟล์ขึ้น Server ---
-    const pdfBlob = doc.output('blob'); // แปลง PDF เป็น Blob
+    // 4. การ Upload และ Save
+    const pdfBlob = doc.output('blob');
     const fileName = `report_${apiData.repair_id}_${Date.now()}.pdf`;
     const formData = new FormData();
-    formData.append('report_file', pdfBlob, fileName); // ชื่อ field ต้องตรงกับ multer 'report_file'
+    formData.append('report_file', pdfBlob, fileName);
 
     try {
-        // Check if API_BASE is defined
-        if (typeof API_BASE === 'undefined') {
-            throw new Error('API_BASE is not defined. Check if status_repair.html has it defined.');
-        }
+        if (typeof API_BASE === 'undefined') throw new Error('API_BASE is not defined');
 
-        console.log("Attempting to upload to:", `${API_BASE}/api/upload-report`);
-
-        // 1. ส่งไฟล์ไปเก็บที่ Server
         const uploadRes = await fetch(`${API_BASE}/api/upload-report`, {
             method: 'POST',
             body: formData
         });
 
-        if (!uploadRes.ok) {
-            const errorText = await uploadRes.text();
-            throw new Error(`Upload failed: ${uploadRes.status} - ${errorText}`);
-        }
-
-        const uploadResult = await uploadRes.json();
-
-        if (uploadResult.success) {
-            // 2. อัปเดตชื่อไฟล์ลง Database (Column: report_url) และปิดงาน
+        if (uploadRes.ok) {
+            const uploadResult = await uploadRes.json();
             const updateRes = await fetch(`${API_BASE}/api/repair/status/${apiData.repair_id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -413,24 +414,18 @@ ${centerSpace}วันที่ ....................................
                     status: 'Fixed',
                     item_id: apiData.item_id,
                     procedure: apiData.Procedure,
-                    report_url: uploadResult.file_name // เก็บชื่อไฟล์จาก Server
+                    report_url: uploadResult.file_name
                 })
             });
 
             if (updateRes.ok) {
                 Swal.fire('สำเร็จ!', 'บันทึกข้อมูลและรายงานเรียบร้อยแล้ว', 'success');
-                doc.save(fileName); // โหลดไฟล์ลงเครื่องผู้ใช้ด้วยเป็นสำเนา
+                doc.save(fileName);
                 if (typeof loadRepairData === 'function') loadRepairData();
             }
         }
     } catch (err) {
         console.error("Upload Error:", err);
-        console.error("Error details:", {
-            message: err.message,
-            api_base: typeof API_BASE !== 'undefined' ? API_BASE : 'NOT DEFINED',
-            repair_id: apiData.repair_id
-        });
-        Swal.fire('Error', `ไม่สามารถเชื่อมต่อ Server เพื่อบันทึกรายงานได้\n\nDetails: ${err.message}`, 'error');
+        Swal.fire('Error', `บันทึกลง Server ไม่สำเร็จ: ${err.message}`, 'error');
     }
 }
-

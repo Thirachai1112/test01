@@ -1,6 +1,5 @@
-const SERVER_IP = window.location.hostname || 'localhost';
 const CONFIG = {
-    API_BASE: `http://${SERVER_IP}:5000`
+    API_BASE: window.location.origin
 };
 
 // เก็บสถานะการแบ่งหน้า
@@ -51,7 +50,6 @@ function renderTable() {
     }
 
     paginatedItems.forEach((item) => {
-        const qrUrl = `${CONFIG.API_BASE}/qrcodes/qr_${item.item_id}.png`;
         const imageUrl = item.image_url 
             ? `${CONFIG.API_BASE}/uploads/${item.image_url}` 
             : 'https://via.placeholder.com/50';
@@ -67,7 +65,7 @@ function renderTable() {
                 <td>${item.category_display_name || 'ทั่วไป'}</td>
                 <td><span class="badge bg-success">ว่างพร้อมใช้งาน</span></td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-outline-dark" onclick="showQR('${qrUrl}', '${item.item_name}')">
+                    <button class="btn btn-sm btn-outline-dark" onclick="showQR(${item.item_id}, '${(item.item_name || '').replace(/'/g, "\\'")}')">
                         <i class="fas fa-qrcode"></i> ดู QR
                     </button>
                 </td>
@@ -155,7 +153,21 @@ function searchInventory() {
     renderTable();
 }
 
-function showQR(qrUrl, itemName) {
+async function showQR(itemId, itemName) {
+    let qrUrl = `${CONFIG.API_BASE}/qrcodes/qr_${itemId}.png`;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/qrcode/${itemId}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data?.success && data?.qr_url) {
+                qrUrl = `${CONFIG.API_BASE}${data.qr_url}`;
+            }
+        }
+    } catch (error) {
+        console.warn('QR API fallback to static path:', error);
+    }
+
     const modalHtml = `
         <div class="modal fade" id="qrTempModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-sm">

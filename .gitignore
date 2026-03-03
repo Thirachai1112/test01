@@ -3,6 +3,7 @@ uploads/
 !.gitkeep
 .env
 backend/.env
+backend/.env.local
 generated_qrcodes/
 # ไฟล์ขยะของระบบปฏิบัติการ
 .DS_Store

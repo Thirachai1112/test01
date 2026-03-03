@@ -60,6 +60,40 @@ const hasExistingImage = (fileName) => {
     return fs.existsSync(fullPath);
 };
 
+const getPublicBaseUrl = (req) => {
+    const configuredBaseUrl = (process.env.PUBLIC_BASE_URL || '').trim();
+    if (configuredBaseUrl) {
+        return configuredBaseUrl.replace(/\/+$/, '');
+    }
+
+    const hostHeader = req.get('host') || `localhost:${Number(process.env.PORT) || 5000}`;
+    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0].trim();
+    const protocol = forwardedProto || req.protocol || 'http';
+
+    const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(hostHeader);
+    if (isLocalHost && process.env.CODESPACE_NAME) {
+        const port = Number(process.env.PORT) || 5000;
+        return `https://${process.env.CODESPACE_NAME}-${port}.app.github.dev`;
+    }
+
+    return `${protocol}://${hostHeader}`;
+};
+
+const ensureQrCodeForItem = async (itemId, baseUrl) => {
+    const qrFolder = path.join(__dirname, 'generated_qrcodes');
+    if (!fs.existsSync(qrFolder)) {
+        fs.mkdirSync(qrFolder, { recursive: true });
+    }
+
+    const qrFileName = `qr_${itemId}.png`;
+    const qrPath = path.join(qrFolder, qrFileName);
+
+    const qrData = `${baseUrl}/testqr.html?id=${itemId}`;
+    await QRCode.toFile(qrPath, qrData);
+
+    return `/qrcodes/${qrFileName}`;
+};
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'Default.html'));
 });
@@ -96,7 +130,7 @@ app.get('/items', (req, res) => {
 
     // กรองสถานะที่ถูกลบออก และค้นหาตามชื่อ/เลขสัญญา/Serial Number
     const searchCondition = `
-        WHERE items.status != 'Deleted' 
+        WHERE items.status NOT IN ('Deleted', 'Maintenance')
         AND (items.item_name LIKE ? OR items.contract_number LIKE ? OR items.serial_number LIKE ? OR items.asset_number LIKE ?)
     `;
     const searchParams = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
@@ -462,6 +496,33 @@ app.get('/employees/:id', (req, res) => {
     });
 });
 
+app.get('/api/qrcode/:itemId', (req, res) => {
+    const { itemId } = req.params;
+
+    if (!/^\d+$/.test(itemId)) {
+        return res.status(400).json({ success: false, message: 'itemId must be numeric' });
+    }
+
+    db.query('SELECT item_id FROM items WHERE item_id = ? LIMIT 1', [itemId], async (err, results) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: err.message });
+        }
+
+        if (!results || results.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบอุปกรณ์' });
+        }
+
+        try {
+            const baseUrl = getPublicBaseUrl(req);
+            const qrUrl = await ensureQrCodeForItem(itemId, baseUrl);
+
+            return res.json({ success: true, item_id: Number(itemId), qr_url: qrUrl });
+        } catch (qrErr) {
+            return res.status(500).json({ success: false, message: qrErr.message });
+        }
+    });
+});
+
 
 // 8.API สำหรับเพิ่มอุปกรณ์ใหม่พร้อมรูปภาพ
 app.post('/add-item', upload.single('image'), (req, res) => {
@@ -500,24 +561,10 @@ app.post('/add-item', upload.single('image'), (req, res) => {
 
         const newItemId = result.insertId;
 
-        // 🚩 ส่วนที่เพิ่มใหม่: การสร้าง QR Code (Logic จาก gen_qr.py)
+        // 🚩 สร้าง QR Code ด้วย JavaScript (Node.js)
         try {
-            const hostHeader = req.get('host') || '';
-            const requestHost = hostHeader.split(':')[0];
-            const serverHost = process.env.SERVER_IP || requestHost || 'localhost';
-            const qrData = `http://${serverHost}:5000/testqr.html?id=${newItemId}`;
-
-            // สร้างโฟลเดอร์ถ้ายังไม่มี
-            const qrFolder = path.join(__dirname, 'generated_qrcodes');
-            if (!fs.existsSync(qrFolder)) {
-                fs.mkdirSync(qrFolder);
-            }
-
-            const qrFileName = `qr_${newItemId}.png`;
-            const qrPath = path.join(qrFolder, qrFileName);
-
-            // สร้างไฟล์ QR Code
-            await QRCode.toFile(qrPath, qrData);
+            const baseUrl = getPublicBaseUrl(req);
+            const qrUrl = await ensureQrCodeForItem(newItemId, baseUrl);
 
             console.log("✅ เพิ่มข้อมูลและสร้าง QR สำเร็จ ID:", newItemId);
 
@@ -526,7 +573,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
                 message: "เพิ่มอุปกรณ์และสร้าง QR Code เรียบร้อยแล้ว",
                 id: newItemId,
                 image: image_url,
-                qr_url: `/qrcodes/${qrFileName}` // 🚩 ส่ง URL รูป QR กลับไปโชว์
+                qr_url: qrUrl // 🚩 ส่ง URL รูป QR กลับไปโชว์
             });
 
         } catch (qrErr) {
@@ -841,120 +888,181 @@ app.get('/api/repair', (req, res) => {
     const sortOrder = req.query.sortOrder === 'ASC' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    // 1. ค้นหาให้ครอบคลุมถึงชื่อพนักงานและรหัสพนักงานที่บันทึกไว้ในตาราง repair
-    const searchCondition = search
-        ? ` WHERE r.brand LIKE ? OR r.contract_number LIKE ? OR r.serial_number LIKE ? 
-            OR r.asset_number LIKE ? OR r.problem LIKE ? OR r.employee_name LIKE ? 
-            OR r.employees_code LIKE ? OR r.affiliation LIKE ? OR r.Problem LIKE ? `
-        : '';
-
-    const searchParams = search
-        ? Array(9).fill(`%${search}%`)
-        : [];
-
-    // 2. นับจำนวนรายการทั้งหมด
-    const countSql = `SELECT COUNT(*) as total FROM repair r ${searchCondition}`;
-
-    db.query(countSql, searchParams, (err, countResult) => {
-        if (err) {
-            console.error("❌ Count Error:", err);
-            return res.status(500).json({ success: false, message: "Error counting records" });
-        }
-
-        const totalRecords = countResult[0].total;
-        const totalPages = Math.ceil(totalRecords / limit);
-
-        // 3. ดึงข้อมูล (เน้นดึงค่าจากตาราง r เป็นหลัก เพื่อให้ข้อมูลที่พิมพ์มาตอนส่งซ่อมแสดงผลได้)
-        const sql = `
-            SELECT 
-                r.repair_id,
-                r.brand,
-                r.contract_number,
-                r.serial_number,
-                r.asset_number,
-                r.affiliation,
-                r.problem,
-                r.repair_url,
-                r.created_at,
-                r.updated_at,
-                r.item_id,
-                r.\`Procedure\`,
-                -- ถ้าในตาราง repair มีชื่อพนักงาน ให้ใช้ชื่อนั้น ถ้าไม่มีค่อยดึงจาก JOIN (Fallback)
-                COALESCE(r.employee_name, CONCAT(e.first_name, ' ', e.last_name)) AS employee_name,
-                COALESCE(r.employees_code, e.employees_code) AS employees_code,
-                COALESCE(r.phone_number, e.phone_number) AS phone_number
-            FROM repair r
-            LEFT JOIN employees e ON r.employee_id = e.id
-            ${searchCondition}
-            ORDER BY ${sortBy === 'repair_id' ? 'r.repair_id' : sortBy} ${sortOrder}
-            LIMIT ? OFFSET ?
-        `;
-
-        const params = [...searchParams, limit, offset];
-
-        db.query(sql, params, (err, results) => {
-            if (err) {
-                console.error("❌ Select Error:", err);
-                return res.status(500).json({ success: false, message: "Error fetching repairs" });
+    db.query(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'repair'`,
+        [DB_NAME],
+        (columnErr, columnRows) => {
+            if (columnErr) {
+                console.error("❌ Column Check Error:", columnErr);
+                return res.status(500).json({ success: false, message: "Error checking repair schema" });
             }
 
-            // 4. จัดการข้อมูล Path รูปภาพ
-            const formattedResults = results.map(row => ({
-                ...row,
-                file_paths: row.repair_url ? row.repair_url.split(',') : []
-            }));
+            const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
+            const hasProcedureColumn = repairColumns.has('Procedure');
 
-            res.json({
-                success: true,
-                data: formattedResults,
-                pagination: {
-                    currentPage: page,
-                    totalPages: totalPages,
-                    totalRecords: totalRecords,
-                    recordsPerPage: limit,
-                    hasNextPage: page < totalPages,
-                    hasPrevPage: page > 1
-                },
-                filters: {
-                    search: search || null,
-                    sortBy: sortBy,
-                    sortOrder: sortOrder
+            const searchableFields = [
+                'r.brand',
+                'r.contract_number',
+                'r.serial_number',
+                'r.asset_number',
+                'r.problem',
+                'r.employee_name',
+                'r.employees_code',
+                'r.affiliation'
+            ];
+
+            if (hasProcedureColumn) {
+                searchableFields.push('r.`Procedure`');
+            }
+
+            const searchCondition = search
+                ? ` WHERE ${searchableFields.map(field => `${field} LIKE ?`).join(' OR ')}`
+                : '';
+
+            const searchParams = search
+                ? Array(searchableFields.length).fill(`%${search}%`)
+                : [];
+
+            const countSql = `SELECT COUNT(*) as total FROM repair r ${searchCondition}`;
+
+            db.query(countSql, searchParams, (countErr, countResult) => {
+                if (countErr) {
+                    console.error("❌ Count Error:", countErr);
+                    return res.status(500).json({ success: false, message: "Error counting records" });
                 }
+
+                const totalRecords = countResult[0].total;
+                const totalPages = Math.ceil(totalRecords / limit);
+
+                const sortableFields = {
+                    repair_id: 'r.repair_id',
+                    created_at: 'r.created_at',
+                    updated_at: 'r.updated_at',
+                    brand: 'r.brand',
+                    serial_number: 'r.serial_number',
+                    asset_number: 'r.asset_number',
+                    contract_number: 'r.contract_number'
+                };
+
+                const orderByField = sortableFields[sortBy] || 'r.repair_id';
+                const procedureSelect = hasProcedureColumn ? 'r.`Procedure`' : 'NULL AS `Procedure`';
+
+                const sql = `
+                    SELECT 
+                        r.repair_id,
+                        r.brand,
+                        r.contract_number,
+                        r.serial_number,
+                        r.asset_number,
+                        r.affiliation,
+                        r.problem,
+                        r.repair_url,
+                        r.created_at,
+                        r.updated_at,
+                        r.item_id,
+                        ${procedureSelect},
+                        COALESCE(r.employee_name, CONCAT(e.first_name, ' ', e.last_name)) AS employee_name,
+                        COALESCE(r.employees_code, e.employees_code) AS employees_code,
+                        COALESCE(r.phone_number, e.phone_number) AS phone_number
+                    FROM repair r
+                    LEFT JOIN employees e ON r.employee_id = e.id
+                    ${searchCondition}
+                    ORDER BY ${orderByField} ${sortOrder}
+                    LIMIT ? OFFSET ?
+                `;
+
+                const params = [...searchParams, limit, offset];
+
+                db.query(sql, params, (selectErr, results) => {
+                    if (selectErr) {
+                        console.error("❌ Select Error:", selectErr);
+                        return res.status(500).json({ success: false, message: "Error fetching repairs" });
+                    }
+
+                    const formattedResults = results.map(row => ({
+                        ...row,
+                        file_paths: row.repair_url ? row.repair_url.split(',') : []
+                    }));
+
+                    res.json({
+                        success: true,
+                        data: formattedResults,
+                        pagination: {
+                            currentPage: page,
+                            totalPages: totalPages,
+                            totalRecords: totalRecords,
+                            recordsPerPage: limit,
+                            hasNextPage: page < totalPages,
+                            hasPrevPage: page > 1
+                        },
+                        filters: {
+                            search: search || null,
+                            sortBy: sortBy,
+                            sortOrder: sortOrder
+                        }
+                    });
+                });
             });
-        });
-    });
+        }
+    );
 });
 
 app.get('/api/repair-management', (req, res) => {
-    // ดึงเฉพาะข้อมูลตัวอักษรที่เราต้องการแสดงผล
-    const sql = `
-        SELECT 
-            repair_id, 
-            employee_name, 
-            employee_id, 
-            phone_number, 
-            affiliation,
-            brand, 
-            serial_number, 
-            asset_number, 
-            problem, 
-            status, 
-            created_at, 
-            finished_at,
-            repair_url,
-            \`Procedure\`
-        FROM repair 
-        WHERE status != 'Fixed'
-        ORDER BY created_at DESC
-    `;
+    db.query(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'repair'`,
+        [DB_NAME],
+        (columnErr, columnRows) => {
+            if (columnErr) {
+                console.error("❌ SQL Error:", columnErr.message);
+                return res.status(500).json({ success: false, error: columnErr.message });
+            }
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("❌ SQL Error:", err.message);
-            return res.status(500).json({ success: false, error: err.message });
+            const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
+            const selectExpr = (name, alias = null) => {
+                if (!repairColumns.has(name)) {
+                    return alias ? `NULL AS ${alias}` : `NULL AS \`${name}\``;
+                }
+                const col = `\`${name}\``;
+                return alias ? `${col} AS ${alias}` : col;
+            };
+
+            const sql = `
+                SELECT 
+                    ${selectExpr('repair_id')},
+                    ${selectExpr('item_id')},
+                    ${selectExpr('employee_name')},
+                    ${selectExpr('employee_id')},
+                    ${selectExpr('employees_code')},
+                    ${selectExpr('phone_number')},
+                    ${selectExpr('affiliation')},
+                    ${selectExpr('brand')},
+                    ${selectExpr('serial_number')},
+                    ${selectExpr('asset_number')},
+                    ${selectExpr('contract_number')},
+                    ${selectExpr('problem')},
+                    ${selectExpr('status')},
+                    ${selectExpr('created_at')},
+                    ${selectExpr('finished_at')},
+                    ${selectExpr('repair_url')},
+                    ${selectExpr('Procedure')}
+                FROM repair
+                WHERE status != 'Fixed'
+                ORDER BY created_at DESC
+            `;
+
+            db.query(sql, (err, results) => {
+                if (err) {
+                    console.error("❌ SQL Error:", err.message);
+                    return res.status(500).json({ success: false, error: err.message });
+                }
+                res.json({ success: true, data: results });
+            });
         }
-        res.json({ success: true, data: results });
-    });
+    );
 });
 
 // อัปเดตสถานะการซ่อมแซม
@@ -994,35 +1102,53 @@ app.get('/api/repair-status', (req, res) => {
         );
     }
 
-    const sql = `
-        SELECT 
-            repair_id, 
-            item_id, 
-            brand, 
-            asset_number, 
-            serial_number, 
-            contract_number,
-            employee_name, 
-            employees_code AS employee_id, -- Alias เป็น employee_id
-            phone_number,                   -- ตรงกับ frontend
-            affiliation AS department,     -- Alias เป็น department
-            problem, 
-            status, 
-            created_at, 
-            repair_url,
-            \`Procedure\`
-        FROM repair
-        WHERE ${whereClauses.join(' AND ')}
-        ORDER BY created_at DESC
-    `;
+    db.query(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'repair'`,
+        [DB_NAME],
+        (columnErr, columnRows) => {
+            if (columnErr) {
+                console.error("❌ Column Check Error:", columnErr.message);
+                return res.status(500).json({ success: false, message: columnErr.message });
+            }
 
-    db.query(sql, params, (err, results) => {
-        if (err) {
-            console.error("❌ SQL Error:", err.message);
-            return res.status(500).json({ success: false, message: err.message });
+            const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
+            const procedureSelect = repairColumns.has('Procedure')
+                ? '`Procedure`'
+                : 'NULL AS `Procedure`';
+
+            const sql = `
+                SELECT 
+                    repair_id, 
+                    item_id, 
+                    brand, 
+                    asset_number, 
+                    serial_number, 
+                    contract_number,
+                    employee_name, 
+                    employees_code AS employee_id,
+                    phone_number,
+                    affiliation AS department,
+                    problem, 
+                    status, 
+                    created_at, 
+                    repair_url,
+                    ${procedureSelect}
+                FROM repair
+                WHERE ${whereClauses.join(' AND ')}
+                ORDER BY created_at DESC
+            `;
+
+            db.query(sql, params, (err, results) => {
+                if (err) {
+                    console.error("❌ SQL Error:", err.message);
+                    return res.status(500).json({ success: false, message: err.message });
+                }
+                res.json({ success: true, data: results });
+            });
         }
-        res.json({ success: true, data: results });
-    });
+    );
 });
 
 
@@ -1046,7 +1172,6 @@ app.put('/api/repair/status/:id', async (req, res) => {
     const connection = await db.promise().getConnection();
     try {
         await connection.beginTransaction();
-        const normalizeLookupValue = (value = '') => value.toString().trim().toLowerCase().replace(/[\s\-_]/g, '');
 
         // ก. ตรวจสอบข้อมูลใบแจ้งซ่อม
         const [repairRows] = await connection.query("SELECT problem, item_id, serial_number, asset_number, contract_number FROM repair WHERE repair_id = ?", [repairId]);
@@ -1058,46 +1183,38 @@ app.put('/api/repair/status/:id', async (req, res) => {
             ? requestItemId
             : (Number.isInteger(repairItemId) && repairItemId > 0 ? repairItemId : null);
 
-        if (!resolvedItemId) {
-            const serial = (repairRows[0].serial_number || '').trim();
-            const asset = (repairRows[0].asset_number || '').trim();
-            const contract = (repairRows[0].contract_number || '').trim();
-            const conditions = [];
-            const params = [];
-
-            if (serial) {
-                const serialNorm = normalizeLookupValue(serial);
-                conditions.push("(serial_number = ? OR REPLACE(REPLACE(REPLACE(LOWER(TRIM(serial_number)), ' ', ''), '-', ''), '_', '') = ?)");
-                params.push(serial, serialNorm);
-            }
-            if (asset) {
-                const assetNorm = normalizeLookupValue(asset);
-                conditions.push("(asset_number = ? OR REPLACE(REPLACE(REPLACE(LOWER(TRIM(asset_number)), ' ', ''), '-', ''), '_', '') = ?)");
-                params.push(asset, assetNorm);
-            }
-            if (contract) {
-                const contractNorm = normalizeLookupValue(contract);
-                conditions.push("(contract_number = ? OR REPLACE(REPLACE(REPLACE(LOWER(TRIM(contract_number)), ' ', ''), '-', ''), '_', '') = ?)");
-                params.push(contract, contractNorm);
-            }
-
-            if (conditions.length > 0) {
-                const lookupSql = `SELECT item_id FROM items WHERE ${conditions.join(' OR ')} ORDER BY item_id DESC LIMIT 1`;
-                const [lookupRows] = await connection.query(lookupSql, params);
-                if (lookupRows.length > 0) {
-                    resolvedItemId = Number(lookupRows[0].item_id);
-                    await connection.query("UPDATE repair SET item_id = ? WHERE repair_id = ?", [resolvedItemId, repairId]);
-                }
-            }
-        }
+        let archivedAndRemoved = false;
+        let archiveSkipReason = '';
 
         if (resolvedItemId) {
             const [itemRows] = await connection.query("SELECT * FROM items WHERE item_id = ?", [resolvedItemId]);
             if (itemRows.length === 0) {
-                throw new Error(`ไม่พบอุปกรณ์ item_id=${resolvedItemId} ในตาราง items`);
+                archiveSkipReason = `ไม่พบอุปกรณ์ item_id=${resolvedItemId} ในตาราง items จึงไม่เก็บเข้า item_repair`;
+                resolvedItemId = null;
             }
 
+            if (resolvedItemId) {
+
             const itemSnapshot = itemRows[0];
+
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS item_repair (
+                    archive_id INT AUTO_INCREMENT PRIMARY KEY,
+                    repair_id INT NULL,
+                    item_id INT NULL,
+                    item_name VARCHAR(255) NULL,
+                    Serial_Number VARCHAR(255) NULL,
+                    asset_number VARCHAR(255) NULL,
+                    contract_number VARCHAR(255) NULL,
+                    cat_id INT NULL,
+                    image_url VARCHAR(255) NULL,
+                    status VARCHAR(50) NULL,
+                    item_created_at DATETIME NULL,
+                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            {
 
             // ข. บันทึกลงตาราง item_repair โดยเก็บได้เท่าที่โครงสร้างตารางรองรับ
             const [existingArchiveRows] = await connection.query(
@@ -1132,49 +1249,87 @@ app.put('/api/repair/status/:id', async (req, res) => {
 
                 const insertColumns = Object.keys(archiveData).filter(col => supportedColumns.has(col));
                 if (insertColumns.length < 2 || !insertColumns.includes('repair_id') || !insertColumns.includes('item_id')) {
-                    throw new Error('โครงสร้างตาราง item_repair ไม่รองรับคอลัมน์ repair_id/item_id ที่จำเป็น');
+                    archiveSkipReason = 'โครงสร้างตาราง item_repair ไม่รองรับคอลัมน์ repair_id/item_id จึงข้ามการย้ายข้อมูล';
+                } else {
+                    const insertValues = insertColumns.map(col => archiveData[col]);
+                    const insertSql = `
+                        INSERT INTO item_repair (${insertColumns.map(col => `\`${col}\``).join(', ')})
+                        VALUES (${insertColumns.map(() => '?').join(', ')})
+                    `;
+                    await connection.query(insertSql, insertValues);
                 }
-
-                const insertValues = insertColumns.map(col => archiveData[col]);
-                const insertSql = `
-                    INSERT INTO item_repair (${insertColumns.map(col => `\`${col}\``).join(', ')})
-                    VALUES (${insertColumns.map(() => '?').join(', ')})
-                `;
-                await connection.query(insertSql, insertValues);
             }
 
-            // ค. ตัดความสัมพันธ์ก่อนลบ item ออกจากคลังหลัก
-            await connection.query("UPDATE repair SET item_id = NULL WHERE repair_id = ?", [repairId]);
+                if (!archiveSkipReason) {
+                    // ค. ตัดความสัมพันธ์ก่อนลบ item ออกจากคลังหลัก
+                    await connection.query("UPDATE repair SET item_id = NULL WHERE repair_id = ?", [repairId]);
 
-            const [activeBorrowRows] = await connection.query(
-                "SELECT log_id FROM borrowing_logs WHERE item_id = ? AND return_date IS NULL LIMIT 1",
-                [resolvedItemId]
-            );
-            if (activeBorrowRows.length > 0) {
-                throw new Error('ไม่สามารถลบอุปกรณ์จาก items ได้ เนื่องจากยังมีรายการยืมที่ยังไม่คืน');
+                    const [activeBorrowRows] = await connection.query(
+                        "SELECT log_id FROM borrowing_logs WHERE item_id = ? AND return_date IS NULL LIMIT 1",
+                        [resolvedItemId]
+                    );
+                    if (activeBorrowRows.length > 0) {
+                        throw new Error('ไม่สามารถลบอุปกรณ์จาก items ได้ เนื่องจากยังมีรายการยืมที่ยังไม่คืน');
+                    }
+
+                    await connection.query("UPDATE borrowing_logs SET item_id = NULL WHERE item_id = ?", [resolvedItemId]);
+                    await connection.query("DELETE FROM items WHERE item_id = ?", [resolvedItemId]);
+                    archivedAndRemoved = true;
+                }
             }
-
-            await connection.query("UPDATE borrowing_logs SET item_id = NULL WHERE item_id = ?", [resolvedItemId]);
-            await connection.query("DELETE FROM items WHERE item_id = ?", [resolvedItemId]);
+            }
         }
 
-        // ง. อัปเดตตาราง repair (ใส่ Procedure และชื่อไฟล์ PDF)
+        // ง. อัปเดตตาราง repair (รองรับกรณีไม่มีคอลัมน์ Procedure)
+        const [repairColumnRows] = await connection.query(`
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'repair'
+        `);
+        const repairColumns = new Set(repairColumnRows.map(row => row.COLUMN_NAME));
+
+        const updateFields = ["status = 'Fixed'"];
+        const updateParams = [];
+
+        if (repairColumns.has('Procedure')) {
+            updateFields.push("\`Procedure\` = ?");
+            updateParams.push(procedure || null);
+        }
+
+        if (repairColumns.has('report_url')) {
+            updateFields.push("report_url = ?");
+            updateParams.push(report_url || null);
+        }
+
+        if (repairColumns.has('finished_at')) {
+            updateFields.push("finished_at = NOW()");
+        }
+
+        if (repairColumns.has('updated_at')) {
+            updateFields.push("updated_at = NOW()");
+        }
+
+        updateParams.push(repairId);
+
         const updateRepairSql = `
-            UPDATE repair 
-            SET status = 'Fixed', \`Procedure\` = ?, report_url = ?, finished_at = NOW(), updated_at = NOW() 
+            UPDATE repair
+            SET ${updateFields.join(', ')}
             WHERE repair_id = ?`;
-        await connection.query(updateRepairSql, [procedure, report_url, repairId]);
+        await connection.query(updateRepairSql, updateParams);
 
         await connection.commit();
-        if (resolvedItemId) {
+        if (resolvedItemId && archivedAndRemoved) {
             res.json({ success: true, message: 'ปิดงานซ่อมเรียบร้อย: ย้ายอุปกรณ์ไป item_repair และลบออกจาก items แล้ว' });
-        } else {
-            const serial = (repairRows[0].serial_number || '').trim() || '-';
-            const asset = (repairRows[0].asset_number || '').trim() || '-';
-            const contract = (repairRows[0].contract_number || '').trim() || '-';
+        } else if (resolvedItemId && archiveSkipReason) {
             res.json({
                 success: true,
-                message: `ปิดงานซ่อมเรียบร้อยแล้ว (ไม่พบ item_id ที่จับคู่ได้: serial=${serial}, asset=${asset}, contract=${contract})`
+                message: `ปิดงานซ่อมเรียบร้อยแล้ว (${archiveSkipReason})`
+            });
+        } else {
+            res.json({
+                success: true,
+                message: archiveSkipReason || 'ปิดงานซ่อมเรียบร้อยแล้ว (ไม่มี item_id จากตาราง items จึงไม่เก็บเข้า item_repair)'
             });
         }
 
@@ -1194,32 +1349,99 @@ app.put('/api/repair/status/:id', async (req, res) => {
 
 // ดึงข้อมูลจากตาราง repair_item (รายการอุปกรณ์ที่นำไปซ่อม)
 app.get('/api/repair-items', (req, res) => {
-    // JOIN items เพื่อเอาชื่อ/SN และ JOIN repair เพื่อเอาอาการเสีย
-    const sql = `
-        SELECT 
-            ir.archive_id,
-            ir.item_id,
-            ir.repair_id,
-            COALESCE(ir.item_name, i.item_name, r.brand, '-') AS item_name,
-            COALESCE(r.employee_name, '-') AS owner_name,
-            COALESCE(r.employees_code, '-') AS employee_code,
-            COALESCE(i.asset_number, r.asset_number, '-') AS asset_number,
-            COALESCE(ir.Serial_Number, i.serial_number, r.serial_number, '-') AS serial_number,
-            COALESCE(r.problem, r.\`Procedure\`, '-') AS problem_description,
-            COALESCE(r.brand, '-') AS brand,
-            COALESCE(r.contract_number, '-') AS contract_number,
-            COALESCE(r.affiliation, '-') AS affiliation,
-            ir.archived_at
-        FROM item_repair ir
-        LEFT JOIN items i ON ir.item_id = i.item_id
-        LEFT JOIN repair r ON ir.repair_id = r.repair_id
-        ORDER BY ir.archived_at DESC
-    `;
+    db.query(
+        `SELECT COUNT(*) AS total
+         FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'item_repair'`,
+        [DB_NAME],
+        (tableErr, tableRows) => {
+            if (tableErr) {
+                return res.status(500).json({ success: false, error: tableErr.message });
+            }
 
-    db.query(sql, (err, results) => {
-        if (err) return res.status(500).json({ success: false, error: err.message });
-        res.json({ success: true, data: results });
-    });
+            const hasItemRepairTable = Number(tableRows[0]?.total || 0) > 0;
+            if (!hasItemRepairTable) {
+                return res.json({ success: true, data: [] });
+            }
+
+            db.query(
+                `SELECT COLUMN_NAME
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'item_repair'`,
+                [DB_NAME],
+                (itemRepairColumnErr, itemRepairColumnRows) => {
+                    if (itemRepairColumnErr) {
+                        return res.status(500).json({ success: false, error: itemRepairColumnErr.message });
+                    }
+
+                    db.query(
+                        `SELECT COLUMN_NAME
+                         FROM INFORMATION_SCHEMA.COLUMNS
+                         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'repair'`,
+                        [DB_NAME],
+                        (repairColumnErr, repairColumnRows) => {
+                            if (repairColumnErr) {
+                                return res.status(500).json({ success: false, error: repairColumnErr.message });
+                            }
+
+                            const itemRepairColumns = new Set(itemRepairColumnRows.map(row => row.COLUMN_NAME));
+                            const repairColumns = new Set(repairColumnRows.map(row => row.COLUMN_NAME));
+
+                            const archiveIdSelect = itemRepairColumns.has('archive_id') ? 'ir.archive_id' : 'NULL AS archive_id';
+                            const itemIdSelect = itemRepairColumns.has('item_id') ? 'ir.item_id' : 'NULL AS item_id';
+                            const repairIdSelect = itemRepairColumns.has('repair_id') ? 'ir.repair_id' : 'NULL AS repair_id';
+                            const itemNameSource = itemRepairColumns.has('item_name') ? 'ir.item_name' : 'NULL';
+                            const serialSource = itemRepairColumns.has('Serial_Number')
+                                ? 'ir.`Serial_Number`'
+                                : (itemRepairColumns.has('serial_number') ? 'ir.serial_number' : 'NULL');
+                            const archivedAtSelect = itemRepairColumns.has('archived_at')
+                                ? 'ir.archived_at'
+                                : (itemRepairColumns.has('created_at') ? 'ir.created_at AS archived_at' : 'NULL AS archived_at');
+
+                            const itemJoinCondition = itemRepairColumns.has('item_id') ? 'ir.item_id = i.item_id' : '1 = 0';
+                            const repairJoinCondition = itemRepairColumns.has('repair_id') ? 'ir.repair_id = r.repair_id' : '1 = 0';
+                            const problemExpr = repairColumns.has('Procedure')
+                                ? "COALESCE(r.problem, r.`Procedure`, '-')"
+                                : "COALESCE(r.problem, '-')";
+                            const orderByExpr = itemRepairColumns.has('archived_at')
+                                ? 'ir.archived_at DESC'
+                                : (itemRepairColumns.has('created_at') ? 'ir.created_at DESC' : 'r.created_at DESC');
+                            const whereExpr = itemRepairColumns.has('item_id')
+                                ? 'WHERE ir.item_id IS NOT NULL'
+                                : '';
+
+                            const sql = `
+                                SELECT 
+                                    ${archiveIdSelect},
+                                    ${itemIdSelect},
+                                    ${repairIdSelect},
+                                    COALESCE(${itemNameSource}, i.item_name, r.brand, '-') AS item_name,
+                                    COALESCE(r.employee_name, '-') AS owner_name,
+                                    COALESCE(r.employees_code, '-') AS employee_code,
+                                    COALESCE(i.asset_number, r.asset_number, '-') AS asset_number,
+                                    COALESCE(${serialSource}, i.serial_number, r.serial_number, '-') AS serial_number,
+                                    ${problemExpr} AS problem_description,
+                                    COALESCE(r.brand, '-') AS brand,
+                                    COALESCE(r.contract_number, '-') AS contract_number,
+                                    COALESCE(r.affiliation, '-') AS affiliation,
+                                    ${archivedAtSelect}
+                                FROM item_repair ir
+                                LEFT JOIN items i ON ${itemJoinCondition}
+                                LEFT JOIN repair r ON ${repairJoinCondition}
+                                ${whereExpr}
+                                ORDER BY ${orderByExpr}
+                            `;
+
+                            db.query(sql, (err, results) => {
+                                if (err) return res.status(500).json({ success: false, error: err.message });
+                                res.json({ success: true, data: results });
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
 });
 
 const PORT = Number(process.env.PORT) || 5000;

@@ -1,6 +1,5 @@
-const SERVER_IP = window.location.hostname || 'localhost';
 const CONFIG = {
-    API_BASE: `http://${SERVER_IP}:5000`
+    API_BASE: window.location.origin
 };
 
 let state = {
@@ -55,7 +54,8 @@ function renderTable() {
             const files = typeof log.file_paths === 'string' ? JSON.parse(log.file_paths) : log.file_paths;
             fileHtml = files.map(file => {
                 const filename = file.split('/').pop();
-                return `<a href="${CONFIG.API_BASE}${file}" target="_blank" class="btn btn-sm btn-outline-primary p-1 me-1" title="${filename}"><i class="fas fa-file-alt"></i></a>`;
+                const normalizedPath = String(file || '').startsWith('/') ? file : `/${file}`;
+                return `<a href="${CONFIG.API_BASE}${normalizedPath}" target="_blank" class="btn btn-sm btn-outline-primary p-1 me-1" title="${filename}"><i class="fas fa-file-alt"></i></a>`;
             }).join('');
         }
 

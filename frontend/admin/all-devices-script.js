@@ -68,8 +68,6 @@ function displayAllDevices(items) {
             ? `${CONFIG.API_BASE}/uploads/${item.image_url}`
             : 'https://via.placeholder.com/50';
 
-        const qrUrl = `${CONFIG.API_BASE}/qrcodes/qr_${item.item_id}.png`;
-
         const statusBadgeClass = item.status === 'Available' ? 'bg-success' : 
                                item.status === 'Borrowed' ? 'bg-warning text-dark' :
                                item.status === 'Maintenance' ? 'bg-danger' :
@@ -91,7 +89,7 @@ function displayAllDevices(items) {
                     </span>
                 </td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-outline-dark" onclick="showQR('${qrUrl}', '${item.item_name.replace(/'/g, "\\'")}')">
+                    <button class="btn btn-sm btn-outline-dark" onclick="showQR(${item.item_id}, '${item.item_name.replace(/'/g, "\\'")}')">
                         <i class="fas fa-qrcode"></i>
                     </button>
                 </td>
@@ -148,7 +146,21 @@ function goToPage(page) {
 }
 
 // Show QR modal
-function showQR(qrUrl, itemName) {
+async function showQR(itemId, itemName) {
+    let qrUrl = `${CONFIG.API_BASE}/qrcodes/qr_${itemId}.png`;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/qrcode/${itemId}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data?.success && data?.qr_url) {
+                qrUrl = `${CONFIG.API_BASE}${data.qr_url}`;
+            }
+        }
+    } catch (error) {
+        console.warn('QR API fallback to static path:', error);
+    }
+
     const qrImage = document.getElementById('qrDisplayImage');
     const downloadBtn = document.getElementById('qrDownloadBtn');
 

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' http://${SERVER_IP}:5000; img-src 'self' data: http://*:*; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;">
+        content="default-src 'self'; connect-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;">
     <title>รายละเอียดอุปกรณ์</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -155,12 +155,21 @@
         let currentItemData = null;
         const urlParams = new URLSearchParams(window.location.search);
         const itemId = urlParams.get('id');
-        const SERVER_IP = window.location.hostname;
+        const API_BASE = window.location.origin;
 
 
-        if (itemId) {
-            fetch(`http://${SERVER_IP}:5000/items/${itemId}`)
-                .then(response => response.json())
+        if (!itemId) {
+            document.getElementById('content').innerHTML = `<p class="error">ไม่พบรหัสอุปกรณ์ในลิงก์ (id)</p>`;
+        } else if (!/^\d+$/.test(itemId)) {
+            document.getElementById('content').innerHTML = `<p class="error">รหัสอุปกรณ์ไม่ถูกต้อง: ${itemId}</p>`;
+        } else {
+            fetch(`${API_BASE}/items/${itemId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('ไม่พบข้อมูลอุปกรณ์');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     currentItemData = data.items ? data.items[0] : data;
                     const item = currentItemData;
@@ -187,7 +196,7 @@
                         </div>
 
                         ${item.image_url
-                            ? `<img src="http://${SERVER_IP}:5000/uploads/${item.image_url}" alt="รูปอุปกรณ์" onerror="this.src='https://via.placeholder.com/400x300?text=ไม่มีรูปภาพ'">`
+                            ? `<img src="${API_BASE}/uploads/${item.image_url}" alt="รูปอุปกรณ์" onerror="this.src='https://via.placeholder.com/400x300?text=ไม่มีรูปภาพ'">`
                             : '<div style="height:100px; display:flex; align-items:center; justify-content:center; color:#ccc;">ไม่มีรูปภาพประกอบ</div>'}
                         
                         <button class="btn-borrow" onclick="borrowItem('${item.item_id}')" ${!isAvailable ? 'disabled' : ''}>
@@ -277,7 +286,7 @@
                         didOpen: () => { Swal.showLoading(); }
                     });
 
-                    fetch(`http://${SERVER_IP}:5000/borrow`, {
+                    fetch(`${API_BASE}/borrow`, {
                         method: 'POST',
                         body: formData // ส่งเป็น formData แทน JSON
                     })
@@ -421,7 +430,7 @@
                     });
 
                     // ส่งข้อมูลไปยัง API
-                    fetch(`http://${SERVER_IP}:5000/api/repair`, {
+                    fetch(`${API_BASE}/api/repair`, {
                         method: 'POST',
                         body: formData // ส่งเป็น FormData (ห้ามตั้ง Headers เป็น JSON)
                     })
@@ -450,7 +459,7 @@
 
         function returnItem(id) {
             // ดึงข้อมูลการยืมที่ยังไม่ได้คืน
-            fetch(`http://${SERVER_IP}:5000/borrowing-active`)
+            fetch(`${API_BASE}/borrowing-active`)
                 .then(res => res.json())
                 .then(logs => {
                     // หาการยืมสำหรับ item นี้
@@ -487,7 +496,7 @@
                             });
 
                             // ส่ง POST ไปที่ /return
-                            fetch(`http://${SERVER_IP}:5000/return`, {
+                            fetch(`${API_BASE}/return`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json'
