@@ -9,7 +9,7 @@ services:
       MYSQL_USER: user_name            # ชื่อผู้ใช้ทั่วไป
       MYSQL_PASSWORD: user_password    # รหัสผ่านผู้ใช้ทั่วไป
     ports:
-      - "3306:3306"                    # Map port ออกมาให้ DBeaver เข้าถึงได้
+      - "13306:3306"                   # Map port ออกมาให้ DBeaver เข้าถึงได้
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

@@ -8,7 +8,13 @@
 
 <script src="THSarabunIT๙-bold.js"></script>
 
-<script src="pdf-generator.js"></script>
+<script>
+    (() => {
+        const script = document.createElement('script');
+        script.src = `pdf-generator.js?v=${Date.now()}`;
+        document.head.appendChild(script);
+    })();
+</script>
 </head>
 <body style="font-family: 'Tahoma', sans-serif; padding: 50px; background-color: #f4f7f6;">
     <div style="max-width: 400px; margin: auto; padding: 30px; background: white; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
