@@ -1,4 +1,49 @@
-﻿async function handleFinishAndGeneratePDF(apiData) {
+﻿function normalizeApproveId(value) {
+    return String(value || '')
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(/-/g, '/');
+}
+
+function normalizeThaiApprovalDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+    const ymdMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (ymdMatch) {
+        const yearBE = Number(ymdMatch[1]) + 543;
+        const monthIndex = Number(ymdMatch[2]) - 1;
+        const day = Number(ymdMatch[3]);
+        if (monthIndex >= 0 && monthIndex < 12) {
+            return `${day} ${thaiMonths[monthIndex]} ${yearBE}`;
+        }
+    }
+
+    const dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (dmyMatch) {
+        const day = Number(dmyMatch[1]);
+        const monthIndex = Number(dmyMatch[2]) - 1;
+        let year = Number(dmyMatch[3]);
+        if (year < 100) year += 2500;
+        if (monthIndex >= 0 && monthIndex < 12) {
+            return `${day} ${thaiMonths[monthIndex]} ${year}`;
+        }
+    }
+
+    return raw;
+}
+
+function normalizeAndStorePdfFormValues(formValues) {
+    return {
+        ...formValues,
+        approveId: normalizeApproveId(formValues.approveId),
+        date: normalizeThaiApprovalDate(formValues.date)
+    };
+}
+
+async function handleFinishAndGeneratePDF(apiData) {
     const { value: formValues } = await Swal.fire({
         title: 'บันทึกรายละเอียดรายงาน',
         html: `
@@ -78,14 +123,20 @@
                 const amount = parseFloat(amountInput.value) || 0;
                 const vat = amount * 0.07;
                 const total = amount + vat;
+                const vatRounded = Math.round(vat);
+                const totalRounded = Math.round(total);
 
-                // แสดงผลแบบทศนิยม 2 ตำแหน่ง พร้อมคอมม่า
-                vatInput.value = vat.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                totalInput.value = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                // แสดงผลแบบจำนวนเต็ม (ไม่มีทศนิยม)
+                vatInput.value = vatRounded.toLocaleString('en-US');
+                totalInput.value = totalRounded.toLocaleString('en-US');
                 
                 // แปลงเป็นตัวอักษรไทย
-                totalTextInput.value = thaiBaht(total);
+                totalTextInput.value = thaiBaht(totalRounded);
             });
+
+            if (amountInput.value) {
+                amountInput.dispatchEvent(new Event('input'));
+            }
         },
         preConfirm: () => {
             return {
@@ -107,16 +158,16 @@
     });
 
     if (formValues) {
-        generateThaiPDF(formValues, apiData);
+        const normalizedFormValues = normalizeAndStorePdfFormValues(formValues);
+        generateThaiPDF(normalizedFormValues, apiData);
     }
 }
 
 // ฟังก์ชันแปลงเลขเป็นตัวอักษรไทย (Bahttext)
 function thaiBaht(number) {
-    if (number === 0) return "ศูนย์บาทถ้วน";
-    const numberStr = number.toFixed(2).split(".");
-    const integerPart = numberStr[0];
-    const decimalPart = numberStr[1];
+    const roundedNumber = Math.round(Number(number) || 0);
+    if (roundedNumber === 0) return "ศูนย์บาทถ้วน";
+    const integerPart = String(roundedNumber);
 
     const units = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
     const digits = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
@@ -137,17 +188,12 @@ function thaiBaht(number) {
         return text.replace("หนึ่งสิบ", "สิบ").replace("สองสิบ", "ยี่สิบ").replace("สิบหนึ่ง", "สิบเอ็ด");
     }
 
-    let result = convert(integerPart) + "บาท";
-    if (decimalPart === "00") {
-        result += "ถ้วน";
-    } else {
-        result += convert(decimalPart) + "สตางค์";
-    }
-    return result;
+    return convert(integerPart) + "บาทถ้วน";
 }
 
 async function generateThaiPDF(formValues, apiData) {
     const PDF_TEMPLATE_VERSION = '20260303p';
+    const HIDE_DETAIL_HORIZONTAL_LINES = true;
     const RIGHT_SIGNATURE_X_OFFSET = 6;
     const { jsPDF } = window.jspdf;
     // กำหนด A4 แนวตั้ง
@@ -171,13 +217,21 @@ async function generateThaiPDF(formValues, apiData) {
     doc.text(`เลขที่ ฉ.2กดส.(ผคข.)                /2569`, 105, 22, { align: 'center' });
 
     // เตรียม Format ตัวเลข
-    const amountVal = parseFloat(formValues.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
-    const vatVal = formValues.vat || '0.00';
-    const totalVal = formValues.total || '0.00';
+    const toIntegerMoney = (value) => {
+        const numericValue = parseFloat(String(value ?? 0).replace(/,/g, '')) || 0;
+        return Math.round(numericValue).toLocaleString('en-US');
+    };
+    const amountVal = toIntegerMoney(formValues.amount || 0);
+    const vatVal = toIntegerMoney(formValues.vat || 0);
+    const totalVal = toIntegerMoney(formValues.total || 0);
+    const amountDisplay = formValues.amount ? amountVal : '_';
     const contractNumber = formValues.contractNumber || apiData.contract_number || apiData.contractNumber || '_';
     const assetCode = formValues.assetCode || apiData.asset_number || apiData.assetCode || '_';
     const serialNumber = formValues.serialNumber || apiData.serial_number || apiData.serialNumber || '_';
+    const letterNo = normalizeApproveId(formValues.approveId || apiData.letter || '');
+    const letterDate = normalizeThaiApprovalDate(formValues.date || apiData.letter_date || '');
     const quantity = formValues.quantity || apiData.quantity || '1';
+    const issueText = apiData.problem_description || apiData.problem || '';
     const accountCode = formValues.accountCode || '53051060';
     const costCenter = formValues.costCenter || 'E30102300';
     const inspectorName = formValues.inspector || '( นายสุทธิศักดิ์ สรรพสาร )';
@@ -186,8 +240,8 @@ async function generateThaiPDF(formValues, apiData) {
     'เรียน หผ.คข.กดส.ฉ.2',
         '        ด้วยแผนก ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/จัดจ้าง',
     'ดำเนินการ โดยวิธีเฉพาะเจาะจงตามรายการ ดังนี้',
-        `        1. ค่าซ่อมเครื่อง ${apiData.brand || '_'} เลขที่สัญญา ${contractNumber} รหัสทรัพย์สิน ${assetCode} Serial Number ${serialNumber} จำนวน ${quantity} เครื่อง ดังนี้`,
-        `        2. เบิกจ่ายจาก รหัสบัญชี ${accountCode} ศูนย์ต้นทุน ${costCenter} วงเงิน ${formValues.amount || '_'} บาท(ราคารวมภาษีมูลค่าเพิ่ม) `,
+        `        1. ค่าซ่อมเครื่อง ${apiData.brand || '_'} เลขที่สัญญา ${contractNumber} รหัสทรัพย์สิน ${assetCode} Serial Number ${serialNumber} อาการเสีย (${issueText || '-'})  ตามหนังสือ ${letterNo || '_'} ลงวันที่ ${letterDate || '_'} จำนวน ${quantity} เครื่อง ดังนี้`,
+        `        2. เบิกจ่ายจาก รหัสบัญชี ${accountCode} ศูนย์ต้นทุน ${costCenter} วงเงิน ${amountDisplay} บาท(ราคารวมภาษีมูลค่าเพิ่ม) `,
     `โดยมีคณะกรรมการตรวจรับตามคำสั่ง ฉ.2 กดส.(พ.)01/2569 ลงวันที่ 5 มกราคม 2569 เป็นผู้ตรวจรับการจัดซื้อ/จัดจ้าง ในวาระนี้.-`,
 
 
@@ -201,7 +255,7 @@ async function generateThaiPDF(formValues, apiData) {
     const rightBottomText = [
         '      เห็นชอบรายงานขอซื้อ/ขอจ้างและอนุมัติสั่งซื้อ/สั่งจ้าง ดำเนินการได้โดยปฏิบัติให้ถูกต้องตามระเบียบ',
     ].join('\n');
-    const introPreviewLines = doc.splitTextToSize(introText1, 92);
+    const introPreviewLines = doc.splitTextToSize(introText1, 130);
     const introMinHeight = Math.max(120, (introPreviewLines.length * 4.6) + 36);
     const topRowMinHeight = Math.max(48, Math.ceil(introMinHeight / 2.2));
 
@@ -226,13 +280,13 @@ async function generateThaiPDF(formValues, apiData) {
             ],
             // ส่วนที่ 2: เนื้อหาหลัก
             [
-                `เรียน อก.ดย.ฉ.2\n       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || '-'} ที่ใช้งานใน กฟฉ.2 ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่ายตามรายการ ดังต่อไปนี้`,
+                `เรียน อก.ดย.ฉ.2\n       ด้วย ผคข.กดส.ฉ.2 มีความประสงค์ขอซื้อ/ขอจ้าง ${formValues.reason || '-'}${issueText ? ` (${issueText})` : ''} ซึ่งดำเนินการแล้ว ปรากฏว่ามีค่าใช้จ่ายตามรายการ ดังต่อไปนี้`,
                 '',
                 ''
             ],
             // ส่วนที่ 3: รายการเงิน (กั้นหลังตรงเป๊ะตามภาพ)
-            [`      1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '1'} เครื่อง`, ` เป็นเงิน   ${amountVal}`, 'บาท'],
-            [`       ( ราคาต่อหน่วย ${amountVal} บาท )     vat 7%`,`เป็นเงิน   ${vatVal}`, 'บาท'],
+            [`1. ค่าซ่อม ${apiData.brand || '-'} จำนวน ${formValues.quantity || '1'} เครื่อง`, ` เป็นเงิน   ${amountVal}`, 'บาท'],
+            [`(ราคาต่อหน่วย ${amountVal} บาท) vat 7%`,`เป็นเงิน   ${vatVal}`, 'บาท'],
             ['', `รวมเป็นเงิน   ${totalVal}`, 'บาท'],
             
 
@@ -247,6 +301,24 @@ async function generateThaiPDF(formValues, apiData) {
         didParseCell: function (data) {
             const rowIndex = data.row.index;
             const colIndex = data.column.index;
+
+            if (HIDE_DETAIL_HORIZONTAL_LINES && rowIndex === 2) {
+                data.cell.styles.lineWidth = { top: 0.1, right: 0.1, bottom: 0, left: 0.1 };
+            }
+
+            if (HIDE_DETAIL_HORIZONTAL_LINES && rowIndex >= 3 && rowIndex <= 6) {
+                if (colIndex === 0) {
+                    data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0, left: 0.1 };
+                } else if (colIndex === 1) {
+                    data.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0, left: 0 };
+                } else if (colIndex === 2) {
+                    data.cell.styles.lineWidth = { top: 0, right: 0.1, bottom: 0, left: 0 };
+                }
+            }
+
+            if (HIDE_DETAIL_HORIZONTAL_LINES && rowIndex === 7) {
+                data.cell.styles.lineWidth = { top: 0, right: 0.1, bottom: 0, left: 0.1 };
+            }
 
             // การ Merge เซลล์
             if (rowIndex === 0 && colIndex === 0) {
@@ -268,57 +340,46 @@ async function generateThaiPDF(formValues, apiData) {
 didDrawCell: function (data) {
     const padding = 4;
     const xPos = data.cell.x + padding;
-    
-    // คำนวณจุดกึ่งกลางของแต่ละ Cell ไว้รอเลย
     const centerX = data.cell.x + (data.cell.width / 2);
 
-    // 1. ฝั่งซ้ายบน (ลายเซ็นผู้ตรวจรับ)
+    // ฝั่งซ้าย (ผู้ตรวจรับ)
     if (data.row.index === 0 && data.column.index === 0) {
-        doc.setFont('THSarabun', 'normal');
-        doc.setFontSize(14); 
+        doc.setFontSize(14);
         const splitIntro = doc.splitTextToSize(introText1, data.cell.width - 8);
-        doc.text(splitIntro, xPos, data.cell.y + 6);
+        doc.text(splitIntro, xPos, data.cell.y + 7); // วาดชิดขอบบน
 
-        const signY = data.cell.y + data.cell.height - 22;
-        // ใช้ align: 'center' เพื่อให้ข้อความทุกบรรทัดเล็งกึ่งกลางช่องพอดี
+        // ดึงลายเซ็นลงมาที่ก้นเซลล์ (ความสูงเซลล์ - 25)
+        const signY = data.cell.y + data.cell.height - 28; 
         doc.text('................................................', centerX, signY, { align: 'center' });
         doc.text(inspectorName, centerX, signY + 7, { align: 'center' });
         doc.text(inspectorPosition, centerX, signY + 14, { align: 'center' });
         doc.text('วันที่ ..............................', centerX, signY + 21, { align: 'center' });
     }
 
-    // 2. ฝั่งขวาบน (เรียน อก. / ลายเซ็นผู้เห็นชอบ)
+    // ฝั่งขวาบน (เห็นชอบ)
     if (data.row.index === 0 && data.column.index === 1) {
-        doc.setFont('THSarabun', 'normal');
-        doc.setFontSize(14); 
-        
-        // ใช้ splitTextToSize เพื่อกันข้อความยาวเกินจนทับลายเซ็น
+        doc.setFontSize(14);
         const rightTopLines = doc.splitTextToSize(rightTopText, data.cell.width - 8);
-        doc.text(rightTopLines, xPos, data.cell.y + 6);
+        doc.text(rightTopLines, xPos, data.cell.y + 7); // วาดชิดขอบบน
 
-        const signY = data.cell.y + data.cell.height - 22;
+        const signY = data.cell.y + data.cell.height - 25;
         doc.text('................................................', centerX, signY, { align: 'center' });
-        doc.text('( นายสุทธิศักดิ์ สรรพสาร )', centerX, signY + 7, { align: 'center' });
-        doc.text('หผ.คข.กดส.ฉ.2', centerX, signY + 14, { align: 'center' });
+        doc.text('(........................................................)', centerX, signY + 7, { align: 'center' });
+        doc.text('.........................................................', centerX, signY + 14, { align: 'center' });
         doc.text('วันที่ ..............................', centerX, signY + 21, { align: 'center' });
     }
 
-    // 3. ฝั่งขวาล่าง (ผู้อนุมัติ)
+    // ฝั่งขวาล่าง (อนุมัติ)
     if (data.row.index === 1 && data.column.index === 1) {
-        doc.setFont('THSarabun', 'normal');
         doc.setFontSize(14);
-        
         const rightBottomLines = doc.splitTextToSize(rightBottomText, data.cell.width - 8);
-        doc.text(rightBottomLines, xPos, data.cell.y + 6);
+        doc.text(rightBottomLines, xPos, data.cell.y + 7);
 
-        doc.setFontSize(12);
-        const signY = data.cell.y + data.cell.height - 18;
-        
-        // จัดกลางช่องขวาล่าง
+        const signY = data.cell.y + 30;
         doc.text('................................................', centerX, signY, { align: 'center' });
-        doc.text('(................................................)', centerX, signY + 6, { align: 'center' });
-        doc.text('................................................', centerX, signY + 12, { align: 'center' });
-        doc.text('วันที่ ..............................', centerX, signY + 18, { align: 'center' });
+        doc.text('(................................................)', centerX, signY + 7, { align: 'center' });
+        doc.text('................................................', centerX, signY + 14, { align: 'center' });
+        doc.text('วันที่ ..............................', centerX, signY + 21, { align: 'center' });
     }
 },
         styles: {
@@ -331,14 +392,14 @@ didDrawCell: function (data) {
             valign: 'top'
         },
         rowStyles: {
-            0: { minCellHeight: topRowMinHeight },
-            1: { minCellHeight: topRowMinHeight },
-            2: { minCellHeight: 10 },
-            3: { minCellHeight: 8 },
-            4: { minCellHeight: 8 },
-            5: { minCellHeight: 8 },
-            6: { minCellHeight: 8 },
-            7: { minCellHeight: 22 }
+            0: { minCellHeight: 120 },
+            1: { minCellHeight: 80 },
+            2: { minCellHeight: 12 },
+            3: { minCellHeight: 10 },
+            4: { minCellHeight: 14 },
+            5: { minCellHeight: 22 },
+            6: { minCellHeight: 16 },
+            7: { minCellHeight: 24 }
         },
         columnStyles: { 
             0: { cellWidth: 100 },               // คอลัมน์ข้อความ
@@ -347,45 +408,43 @@ didDrawCell: function (data) {
         }
     });
 
-    const continuationStartY = (doc.lastAutoTable?.finalY || 24) + 2;
-    doc.autoTable({
-        startY: continuationStartY,
-        theme: 'grid',
-        margin: { left: 8, right: 15, bottom: 5 },
-        pageBreak: 'auto',
-        body: [
-            ['', '', ''],
-            
-        ],
-        didParseCell: function (data) {
-            if (data.row.index === 0 && data.column.index === 0) {
-                data.cell.colSpan = 3;
-            }
-        },
-        styles: {
-            font: 'THSarabun',
-            fontSize: 14,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1,
-            cellPadding: 0.6,
-            overflow: 'linebreak',
-            valign: 'top'
-        },
-        rowStyles: {
-            0: { minCellHeight: 8 },
-            1: { minCellHeight: 16 },
-            2: { minCellHeight: 16 }
-        },
-        columnStyles: {
-            0: { cellWidth: 100 },
-            1: { cellWidth: 72 },
-            2: { cellWidth: 15 }
-        }
-    });
+    const currentPage = doc.internal.getNumberOfPages();
+    doc.setPage(currentPage);
+
+    const pageBottomY = 286;
+    const lastMainTableY = (doc.lastAutoTable?.finalY || 24);
+    const signatureStartY = lastMainTableY;
+    const signatureBlockHeight = pageBottomY - signatureStartY;
+    const canDrawSignatureBlock = signatureBlockHeight >= 45;
+
+    if (canDrawSignatureBlock) {
+        const frameX = 8;
+        const frameWidth = doc.internal.pageSize.getWidth() - 8 - 15;
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.1);
+        const rightX = frameX + frameWidth;
+        const bottomY = signatureStartY + signatureBlockHeight;
+        doc.line(frameX, signatureStartY, frameX, bottomY);
+        doc.line(rightX, signatureStartY, rightX, bottomY);
+        doc.line(frameX, bottomY, rightX, bottomY);
+
+        const centerX = frameX + (frameWidth / 2);
+        const signatureLift = signatureBlockHeight * 0.10;
+        const lineY = signatureStartY + signatureBlockHeight - 32 - signatureLift;
+        const nameY = lineY + 9;
+        const positionY = nameY + 9;
+        const dateY = positionY + 9;
+
+        doc.setFontSize(14);
+        doc.text('................................................', centerX, lineY, { align: 'center' });
+        doc.text('(................................................)', centerX, nameY, { align: 'center' });
+        doc.text('................................................', centerX, positionY, { align: 'center' });
+        doc.text('วันที่ ..............................', centerX, dateY, { align: 'center' });
+    }
 
     doc.setFont('THSarabun', 'normal');
     doc.setFontSize(8);
-    doc.text(`template ${PDF_TEMPLATE_VERSION}`, 200, 292, { align: 'right' });
+    doc.text('ตจ.6 ป.61', 8, 292);
     doc.setFont('THSarabun', 'bold');
 
     // 4. การ Upload และ Save
