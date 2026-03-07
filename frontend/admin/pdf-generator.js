@@ -301,19 +301,6 @@ async function generateThaiPDF(formValues, apiData) {
         didParseCell: function (data) {
             const rowIndex = data.row.index;
             const colIndex = data.column.index;
-
-            // ปรับโทนตารางให้อ่านง่ายขึ้น
-            if (rowIndex === 3 || rowIndex === 4) {
-                data.cell.styles.fillColor = [250, 251, 253];
-            }
-            if (rowIndex === 5) {
-                data.cell.styles.fillColor = [238, 245, 255];
-                data.cell.styles.fontStyle = 'bold';
-            }
-            if (rowIndex === 7) {
-                data.cell.styles.fillColor = [245, 245, 245];
-            }
-
             if (HIDE_DETAIL_HORIZONTAL_LINES && rowIndex === 2) {
                 data.cell.styles.lineWidth = { top: 0.1, right: 0.1, bottom: 0, left: 0.1 };
             }

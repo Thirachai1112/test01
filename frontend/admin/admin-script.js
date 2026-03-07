@@ -236,6 +236,10 @@ window.openNotificationCenter = function openNotificationCenter() {
     };
 
     const renderMenuLink = (kind, label, count) => {
+        if (kind === 'repair') {
+            return `<a href="status_repair.html" style="text-decoration: underline; font-weight: 700;">${label}: ${count} รายการ</a>`;
+        }
+
         if (count <= 0) {
             return `<strong>${label}:</strong> ${count} รายการ`;
         }

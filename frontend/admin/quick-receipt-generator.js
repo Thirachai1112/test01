@@ -18,17 +18,17 @@ async function handleQuickFinishAndGenerateReceipt(apiData) {
     }
 
     const doc = new jsPDF('p', 'mm', 'a4');
-    const hasThaiFont = typeof font !== 'undefined';
-
-    if (hasThaiFont) {
-        doc.addFileToVFS('THSarabun-Bold.ttf', font);
-        doc.addFont('THSarabun-Bold.ttf', 'THSarabun', 'normal');
-        doc.addFont('THSarabun-Bold.ttf', 'THSarabun', 'bold');
-        doc.setFont('THSarabun', 'bold');
-    } else {
-        doc.setFont('helvetica', 'bold');
+    if (typeof font === 'undefined') {
+        Swal.fire('Error', 'ไม่พบข้อมูลฟอนต์ในระบบ (font variable not found)', 'error');
+        return;
     }
 
+    doc.addFileToVFS('THSarabun-Bold.ttf', font);
+    doc.addFont('THSarabun-Bold.ttf', 'THSarabun', 'normal');
+    doc.addFont('THSarabun-Bold.ttf', 'THSarabun', 'bold');
+    doc.setFont('THSarabun', 'normal');
+
+    doc.setFont('THSarabun', 'bold');
     const reportNo = `RC-${apiData.repair_id}-${Date.now().toString().slice(-6)}`;
     const createdAtText = formatThaiDateTime(apiData.created_at);
     const closedAtText = formatThaiDateTime(new Date());

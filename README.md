@@ -17,6 +17,7 @@
 - [การเชื่อมต่อ DBeaver](#การเชื่อมต่อ-dbeaver)
 - [Environment Variables](#environment-variables)
 - [การนำเข้าไฟล์ SQL Dump](#การนำเข้าไฟล์-sql-dump)
+- [Font License Compliance](#font-license-compliance)
 - [Troubleshooting](#troubleshooting)
 - [คำสั่งที่ใช้บ่อย](#คำสั่งที่ใช้บ่อย)
 
@@ -183,6 +184,23 @@ npm start
 cd /workspaces/test01
 docker exec -i mysql_dbeaver mysql -uroot -ppassword123 my_database < dump-my_database-202602111405.sql
 ```
+
+---
+
+## Font License Compliance
+
+ระบบ PDF สำหรับงานซ่อมใช้ฟอนต์จากไฟล์:
+- `frontend/admin/fonts/Sarabun-ExtraLight.ttf`
+- `frontend/admin/fonts/Sarabun-Bold.ttf`
+
+สิทธิ์การใช้งาน:
+- SIL Open Font License 1.1 (ดูไฟล์ `frontend/admin/fonts/OFL.txt`)
+
+เอกสารแหล่งที่มาและ checksum:
+- `frontend/admin/fonts/PROVENANCE.md`
+
+หมายเหตุ:
+- ฟอนต์ legacy แบบฝังโค้ด (`THSarabun-Bold.js`) ถูกถอดออกจากโปรเจกต์แล้ว เพื่อหลีกเลี่ยงความเสี่ยงด้านสิทธิ์การใช้งาน
 
 ---
 
