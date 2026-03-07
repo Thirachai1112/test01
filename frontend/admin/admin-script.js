@@ -14,6 +14,301 @@ let allRepairLogs = [];
 let filteredRepairLogs = [];
 const API_BASE = window.location.origin;
 
+const NOTIFICATION_POLL_MS = 15000;
+const NOTIFICATION_STORAGE_KEY = 'adminRealtimeNotificationStateV1';
+let notificationTimer = null;
+let notificationState = {
+    initialized: false,
+    lastBorrowLogId: 0,
+    lastRepairId: 0,
+    unreadBorrow: 0,
+    unreadRepair: 0,
+    unreadDue: 0,
+    alertedDueLogIds: [],
+    newBorrowLogIds: [],
+    newRepairIds: [],
+    newDueLogIds: []
+};
+
+function mergeRecentIds(existingIds, incomingIds, limit = 20) {
+    const base = Array.isArray(existingIds) ? existingIds.map(normalizeId).filter(Boolean) : [];
+    const incoming = Array.isArray(incomingIds) ? incomingIds.map(normalizeId).filter(Boolean) : [];
+    return Array.from(new Set([...incoming, ...base])).slice(0, limit);
+}
+
+function loadNotificationState() {
+    try {
+        const raw = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        notificationState = {
+            ...notificationState,
+            ...parsed
+        };
+    } catch (error) {
+        console.warn('Unable to load notification state:', error);
+    }
+}
+
+function saveNotificationState() {
+    try {
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notificationState));
+    } catch (error) {
+        console.warn('Unable to save notification state:', error);
+    }
+}
+
+function updateNotificationBadge() {
+    const badge = document.getElementById('admin-notification-badge');
+    if (!badge) return;
+    const totalUnread = Number(notificationState.unreadBorrow || 0)
+        + Number(notificationState.unreadRepair || 0)
+        + Number(notificationState.unreadDue || 0);
+    badge.textContent = String(totalUnread);
+    badge.style.background = totalUnread > 0 ? '#ffcc00' : '#c9d3df';
+}
+
+function showNotificationToast(title, text) {
+    if (typeof Swal === 'undefined') return;
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'info',
+        title,
+        text,
+        showConfirmButton: false,
+        timer: 4500,
+        timerProgressBar: true
+    });
+}
+
+function normalizeId(value) {
+    const id = Number(value);
+    return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function parseUtcDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    const normalized = raw.replace(' ', 'T');
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+    const isoValue = hasTimezone ? normalized : `${normalized}Z`;
+    const parsed = new Date(isoValue);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseDueDateFromLog(log) {
+    const directValue = String(log.return_due_date || '').trim();
+    if (directValue) {
+        const directParsed = parseUtcDateTime(directValue);
+        if (directParsed) {
+            return directParsed;
+        }
+    }
+
+    const noteText = String(log.note || '').trim();
+    const dateMatch = noteText.match(/(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?)/);
+    if (!dateMatch) return null;
+
+    const parsedFromNote = parseUtcDateTime(dateMatch[1]);
+    return parsedFromNote || null;
+}
+
+async function pollRealtimeNotifications() {
+    try {
+        const [borrowRes, repairRes] = await Promise.all([
+            fetch(`${API_BASE}/borrowing-logs`),
+            fetch(`${API_BASE}/api/repair?page=1&limit=50`)
+        ]);
+
+        if (!borrowRes.ok || !repairRes.ok) return;
+
+        const [borrowData, repairData] = await Promise.all([
+            borrowRes.json(),
+            repairRes.json()
+        ]);
+
+        const borrowLogs = Array.isArray(borrowData.logs) ? borrowData.logs : [];
+        const repairLogs = repairData && repairData.success && Array.isArray(repairData.data)
+            ? repairData.data
+            : [];
+
+        const newestBorrowId = borrowLogs.reduce((maxId, log) => Math.max(maxId, normalizeId(log.log_id)), 0);
+        const newestRepairId = repairLogs.reduce((maxId, repair) => Math.max(maxId, normalizeId(repair.repair_id)), 0);
+
+        if (!notificationState.initialized) {
+            notificationState.initialized = true;
+            notificationState.lastBorrowLogId = newestBorrowId;
+            notificationState.lastRepairId = newestRepairId;
+            updateNotificationBadge();
+            saveNotificationState();
+            return;
+        }
+
+        const newBorrowCount = borrowLogs.filter((log) => normalizeId(log.log_id) > notificationState.lastBorrowLogId).length;
+        const newRepairCount = repairLogs.filter((repair) => normalizeId(repair.repair_id) > notificationState.lastRepairId).length;
+        const newBorrowIds = borrowLogs
+            .filter((log) => normalizeId(log.log_id) > notificationState.lastBorrowLogId)
+            .map((log) => normalizeId(log.log_id))
+            .filter(Boolean);
+        const newRepairIds = repairLogs
+            .filter((repair) => normalizeId(repair.repair_id) > notificationState.lastRepairId)
+            .map((repair) => normalizeId(repair.repair_id))
+            .filter(Boolean);
+
+        const activeBorrowLogs = borrowLogs.filter((log) => !log.return_date);
+        const activeBorrowIds = new Set(activeBorrowLogs.map((log) => normalizeId(log.log_id)).filter(Boolean));
+        const existingAlertedIds = Array.isArray(notificationState.alertedDueLogIds)
+            ? notificationState.alertedDueLogIds.map(normalizeId).filter(Boolean)
+            : [];
+        const activeAlertedIds = existingAlertedIds.filter((id) => activeBorrowIds.has(id));
+        const alertedIdSet = new Set(activeAlertedIds);
+
+        const nowTs = Date.now();
+        const dueReachedLogs = activeBorrowLogs.filter((log) => {
+            const dueDate = parseDueDateFromLog(log);
+            return dueDate && dueDate.getTime() <= nowTs;
+        });
+
+        const newlyDueLogs = dueReachedLogs.filter((log) => !alertedIdSet.has(normalizeId(log.log_id)));
+
+        if (newBorrowCount > 0) {
+            notificationState.unreadBorrow += newBorrowCount;
+            notificationState.newBorrowLogIds = mergeRecentIds(notificationState.newBorrowLogIds, newBorrowIds);
+            showNotificationToast('มีรายการยืมใหม่', `พบ ${newBorrowCount} รายการใหม่`);
+        }
+
+        if (newRepairCount > 0) {
+            notificationState.unreadRepair += newRepairCount;
+            notificationState.newRepairIds = mergeRecentIds(notificationState.newRepairIds, newRepairIds);
+            showNotificationToast('มีการแจ้งซ่อมใหม่', `พบ ${newRepairCount} รายการใหม่`);
+        }
+
+        if (newlyDueLogs.length > 0) {
+            notificationState.unreadDue += newlyDueLogs.length;
+            notificationState.newDueLogIds = mergeRecentIds(
+                notificationState.newDueLogIds,
+                newlyDueLogs.map((log) => normalizeId(log.log_id)).filter(Boolean)
+            );
+            showNotificationToast('มีอุปกรณ์ครบกำหนดคืน', `พบ ${newlyDueLogs.length} รายการที่ครบกำหนด`);
+        }
+
+        notificationState.lastBorrowLogId = Math.max(notificationState.lastBorrowLogId, newestBorrowId);
+        notificationState.lastRepairId = Math.max(notificationState.lastRepairId, newestRepairId);
+        const newDueIds = newlyDueLogs.map((log) => normalizeId(log.log_id)).filter(Boolean);
+        notificationState.alertedDueLogIds = Array.from(new Set([...activeAlertedIds, ...newDueIds])).slice(-500);
+        updateNotificationBadge();
+        saveNotificationState();
+    } catch (error) {
+        console.error('Realtime notification poll error:', error);
+    }
+}
+
+function startRealtimeNotifications() {
+    loadNotificationState();
+    updateNotificationBadge();
+    pollRealtimeNotifications();
+
+    if (notificationTimer) {
+        clearInterval(notificationTimer);
+    }
+
+    notificationTimer = setInterval(() => {
+        pollRealtimeNotifications();
+    }, NOTIFICATION_POLL_MS);
+}
+
+window.openNotificationCenter = function openNotificationCenter() {
+    const borrow = Number(notificationState.unreadBorrow || 0);
+    const repair = Number(notificationState.unreadRepair || 0);
+    const due = Number(notificationState.unreadDue || 0);
+    const total = borrow + repair + due;
+
+    const renderItemButtons = (kind, ids) => {
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return '<div class="text-muted small">- ไม่มีรายการใหม่ -</div>';
+        }
+
+        return ids.slice(0, 8).map((id) => (
+            `<button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="openNotificationItem('${kind}', ${id})">#${id}</button>`
+        )).join('');
+    };
+
+    const renderMenuLink = (kind, label, count) => {
+        if (count <= 0) {
+            return `<strong>${label}:</strong> ${count} รายการ`;
+        }
+        return `<a href="javascript:void(0)" onclick="openNotificationMenu('${kind}')" style="text-decoration: underline; font-weight: 700;">${label}: ${count} รายการ</a>`;
+    };
+
+    if (typeof Swal === 'undefined') return;
+
+    Swal.fire({
+        title: 'ศูนย์แจ้งเตือน Admin',
+        html: `
+            <div class="text-start" style="font-size: 0.95rem;">
+                <div class="mb-2">${renderMenuLink('borrow', 'รายการยืมใหม่', borrow)}</div>
+                <div class="mb-2">${renderItemButtons('borrow', notificationState.newBorrowLogIds)}</div>
+                <div class="mb-2">${renderMenuLink('repair', 'รายการแจ้งซ่อมใหม่', repair)}</div>
+                <div class="mb-2">${renderItemButtons('repair', notificationState.newRepairIds)}</div>
+                <div class="mb-2">${renderMenuLink('due', 'รายการครบกำหนดคืน', due)}</div>
+                <div class="mb-2">${renderItemButtons('due', notificationState.newDueLogIds)}</div>
+                <hr>
+                <div><strong>รวมทั้งหมด:</strong> ${total} รายการ</div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ล้างแจ้งเตือน',
+        cancelButtonText: 'ปิด',
+        confirmButtonColor: '#0d9488'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        notificationState.unreadBorrow = 0;
+        notificationState.unreadRepair = 0;
+        notificationState.unreadDue = 0;
+        notificationState.newBorrowLogIds = [];
+        notificationState.newRepairIds = [];
+        notificationState.newDueLogIds = [];
+        updateNotificationBadge();
+        saveNotificationState();
+    });
+};
+
+window.openNotificationMenu = async function openNotificationMenu(kind) {
+    if (typeof Swal !== 'undefined') {
+        Swal.close();
+    }
+
+    if (kind === 'repair') {
+        showSection('repair-logs');
+        loadRepairLogs(1);
+        return;
+    }
+
+    // borrow and due both point to borrowed list page
+    window.location.href = 'borrowed.html';
+};
+
+window.openNotificationItem = async function openNotificationItem(kind, id) {
+    const normalizedId = normalizeId(id);
+    if (!normalizedId) return;
+
+    if (kind === 'borrow' || kind === 'due') {
+        window.location.href = 'borrowed.html';
+        return;
+    }
+
+    if (kind === 'repair') {
+        showSection('repair-logs');
+        const repairSearchInput = document.getElementById('repair-search');
+        if (repairSearchInput) {
+            repairSearchInput.value = String(normalizedId);
+        }
+        loadRepairLogs(1);
+    }
+};
+
 // ฟังก์ชันค้นหาอุปกรณ์
 function searchInventory() {
     const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
@@ -132,6 +427,34 @@ async function loadBorrowingLogs(page = 1) {
     }
 }
 
+function getDueReturnDisplayFromLog(log) {
+    const rawFromField = String(log.return_due_date || '').trim();
+    if (rawFromField) {
+        const parsed = parseUtcDateTime(rawFromField);
+        if (parsed) {
+            return parsed.toLocaleString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        }
+        return rawFromField;
+    }
+
+    const noteText = String(log.note || '').trim();
+    const match = noteText.match(/^กำหนดคืน:\s*(.+)$/i);
+    if (!match) return '-';
+
+    const raw = match[1].trim();
+    const normalized = raw.replace(' ', 'T');
+    const parsed = parseUtcDateTime(normalized);
+    if (parsed) {
+        return parsed.toLocaleString('th-TH', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    return raw;
+}
+
 // ฟังก์ชันแสดงข้อมูล borrowing logs
 function displayBorrowingLogs(logs, page) {
     const totalPages = Math.ceil(logs.length / logsPerPage);
@@ -152,6 +475,7 @@ function displayBorrowingLogs(logs, page) {
             const serialNumber = log.serial_number || '-';
             const serialColor = log.serial_number ? 'badge bg-info' : '';
             const purpose = log.purpose ? `<small>${log.purpose}</small>` : '<small class="text-muted">-</small>';
+            const dueReturnDate = getDueReturnDisplayFromLog(log);
 
             // --- ส่วนที่เพิ่ม: จัดการแสดงผลรูปภาพ/ไฟล์ ---
             let filesHtml = '';
@@ -185,6 +509,7 @@ function displayBorrowingLogs(logs, page) {
                     <td>${log.item_name || '-'}</td>
                     <td><span class="${serialColor}">${serialNumber}</span></td>
                     <td>${borrowDate}</td>
+                    <td><small>${dueReturnDate}</small></td>
                     <td>${returnDate}</td>
                     <td>${purpose}</td>
                     <td><span class="badge ${statusBadge}">${status}</span></td>
@@ -695,12 +1020,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('     ')) {
         await loadRepairData(); // เรียกฟังก์ชันโหลดข้อมูลซ่อม
     }
+
+    startRealtimeNotifications();
 });
 
 // ===================== REPAIR LOGS FUNCTIONS =====================
 
 function loadRepairLogs(page = 1) {
     const searchTerm = document.getElementById('repair-search')?.value || '';
+    const numericRepairId = Number(searchTerm);
+    if (Number.isFinite(numericRepairId) && numericRepairId > 0) {
+        const localMatches = (allRepairLogs || []).filter((repair) => Number(repair.repair_id) === numericRepairId);
+        if (localMatches.length > 0) {
+            displayRepairLogs(localMatches);
+            displayRepairPagination({ currentPage: 1, totalPages: 1 });
+            const totalRepairsEl = document.getElementById('totalRepairs');
+            if (totalRepairsEl) totalRepairsEl.textContent = String(localMatches.length);
+            return;
+        }
+    }
     const url = `${API_BASE}/api/repair?page=${page}&limit=${repairLogsPerPage}&search=${searchTerm}`;
 
     fetch(url)
@@ -715,7 +1053,7 @@ function loadRepairLogs(page = 1) {
         })
         .catch(err => {
             console.error('Error loading repair logs:', err);
-            document.getElementById('repair-logs-list').innerHTML = '<tr><td colspan="7" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>';
+            document.getElementById('repair-logs-list').innerHTML = '<tr><td colspan="14" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>';
         });
 }
 
@@ -724,11 +1062,13 @@ function displayRepairLogs(repairs) {
     listElement.innerHTML = '';
 
     if (!repairs || repairs.length === 0) {
-        listElement.innerHTML = '<tr><td colspan="12" class="text-center text-muted p-4">ไม่พบข้อมูลการซ่อม</td></tr>';
+        listElement.innerHTML = '<tr><td colspan="14" class="text-center text-muted p-4">ไม่พบข้อมูลการซ่อม</td></tr>';
         return;
     }
 
     repairs.forEach((repair) => {
+        const repairMethod = repair.repair_method || repair.Procedure || '-';
+
         // 1. จัดการข้อความปัญหา (ตัดข้อความ)
         const problemText = repair.problem ? repair.problem.substring(0, 20) + (repair.problem.length > 20 ? '...' : '') : '-';
 
@@ -743,6 +1083,11 @@ function displayRepairLogs(repairs) {
         const updatedDate = (repair.updated_at && repair.updated_at !== repair.created_at)
             ? new Date(repair.updated_at).toLocaleString('th-TH', dateOptions)
             : '<span class="badge bg-light text-warning fw-normal border">รอดำเนินการ</span>';
+
+        const repairPrice = Number(repair.price);
+        const repairPriceText = Number.isFinite(repairPrice) && repairPrice >= 0
+            ? repairPrice.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '-';
 
         // 3. จัดการไฟล์แนบ
         let fileHtml = '<small class="text-muted">ไม่มี</small>';
@@ -788,7 +1133,8 @@ function displayRepairLogs(repairs) {
                 <td><code>${repair.asset_number || '-'}</code></td>
                 <td>${repair.affiliation || '-'}</td>
                 <td title="${repair.problem || ''}">${problemText}</td>
-                <td title="${repair.Procedure || ''}">${repair.Procedure || '-'}</td>
+                <td title="${repairMethod}">${repairMethod}</td>
+                <td class="text-end">${repairPriceText}</td>
                 <td class="text-nowrap"><small>${createdDate}</small></td>
                 <td class="text-nowrap"><small>${updatedDate}</small></td>
                 <td>${fileHtml}</td>
@@ -967,6 +1313,7 @@ async function showBorrowDetail(logId) {
         
         const borrowDate = new Date(log.borrow_date).toLocaleString('th-TH');
         const returnDate = log.return_date ? new Date(log.return_date).toLocaleString('th-TH') : '-';
+        const dueReturnDate = getDueReturnDisplayFromLog(log);
         const status = log.return_date ? '<span class="badge bg-success">คืนแล้ว</span>' : '<span class="badge bg-warning text-dark">กำลังยืม</span>';
         
         Swal.fire({
@@ -979,6 +1326,7 @@ async function showBorrowDetail(logId) {
                     <div class="mb-3"><strong>Serial Number:</strong> <code>${log.serial_number || '-'}</code></div>
                     <div class="mb-3"><strong>วัตถุประสงค์:</strong> ${log.purpose || '-'}</div>
                     <div class="mb-3"><strong>วันที่ยืม:</strong> ${borrowDate}</div>
+                    <div class="mb-3"><strong>กำหนดการคืน:</strong> ${dueReturnDate}</div>
                     <div class="mb-3"><strong>วันที่คืน:</strong> ${returnDate}</div>
                     <div class="mb-3"><strong>สถานะ:</strong> ${status}</div>
                     ${log.note ? `<div class="mb-3"><strong>หมายเหตุ:</strong> ${log.note}</div>` : ''}

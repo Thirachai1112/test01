@@ -60,6 +60,37 @@
         .table .hover-row {
             transition: all 0.2s ease;
         }
+
+        .notification-pill {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .notification-pill:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .notification-badge {
+            min-width: 26px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #ffcc00;
+            color: #1f2a37;
+            font-weight: 700;
+            text-align: center;
+            font-size: 0.82rem;
+        }
     </style>
 </head>
 
@@ -96,6 +127,12 @@
 
 
         </ul>
+
+        <div class="notification-pill" onclick="openNotificationCenter()" title="ดูแจ้งเตือนล่าสุด">
+            <span><i class="fas fa-bell me-2"></i>แจ้งเตือนใหม่</span>
+            <span id="admin-notification-badge" class="notification-badge">0</span>
+        </div>
+
         <div class="mt-auto p-3">
             <div class="user-info mb-3" id="userInfo">
                 <small><i class="fas fa-user-circle me-1"></i> <span id="usernameDisplay">Admin</span></small>
@@ -242,7 +279,8 @@
                                 <th>สังกัด</th>
                                 <th>อุปกรณ์</th>
                                 <th>Serial Number</th>
-                                <th>วานที่ยืม</th>
+                                <th>วันที่ยืม</th>
+                                <th>กำหนดการคืน</th>
                                 <th>วันที่คืน</th>
                                 <th>วัตถุประสงการยืม</th>
                                 <th>สถานะ</th>
@@ -292,6 +330,7 @@
                                 <th>สังกัด</th>
                                 <th>อาการที่ชำรุด</th>
                                 <th>วิธีการซ่อม</th>
+                                <th>ค่าซ่อม</th>
                                 <th>วันที่ส่งซ่อม</th>
                                 <th>วันที่ซ่อมเสร็จ</th>
                                 <th>ไฟล์หลักฐาน</th>

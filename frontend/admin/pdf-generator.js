@@ -302,6 +302,18 @@ async function generateThaiPDF(formValues, apiData) {
             const rowIndex = data.row.index;
             const colIndex = data.column.index;
 
+            // ปรับโทนตารางให้อ่านง่ายขึ้น
+            if (rowIndex === 3 || rowIndex === 4) {
+                data.cell.styles.fillColor = [250, 251, 253];
+            }
+            if (rowIndex === 5) {
+                data.cell.styles.fillColor = [238, 245, 255];
+                data.cell.styles.fontStyle = 'bold';
+            }
+            if (rowIndex === 7) {
+                data.cell.styles.fillColor = [245, 245, 245];
+            }
+
             if (HIDE_DETAIL_HORIZONTAL_LINES && rowIndex === 2) {
                 data.cell.styles.lineWidth = { top: 0.1, right: 0.1, bottom: 0, left: 0.1 };
             }
@@ -384,12 +396,16 @@ didDrawCell: function (data) {
 },
         styles: {
             font: 'THSarabun', 
-            fontSize: 14, // ลดขนาดตัวอักษรเพื่อให้จบในหน้าเดียว
-            lineColor: [0, 0, 0], 
-            lineWidth: 0.1, 
-            cellPadding: 0.6, // ลด Padding เพื่อให้บรรทัดชิดกันขึ้น
+            fontSize: 14,
+            textColor: [33, 37, 41],
+            lineColor: [138, 146, 166],
+            lineWidth: 0.12,
+            cellPadding: { top: 1.2, right: 1.1, bottom: 1.1, left: 1.1 },
             overflow: 'linebreak',
             valign: 'top'
+        },
+        bodyStyles: {
+            fontStyle: 'normal'
         },
         rowStyles: {
             0: { minCellHeight: 120 },
@@ -452,6 +468,7 @@ didDrawCell: function (data) {
     const fileName = `report_${apiData.repair_id}_${PDF_TEMPLATE_VERSION}_${Date.now()}.pdf`;
     const formData = new FormData();
     formData.append('report_file', pdfBlob, fileName);
+    const numericTotal = Math.round(Number(String(formValues.total || 0).replace(/,/g, '')) || 0);
 
     try {
         if (typeof API_BASE === 'undefined') throw new Error('API_BASE is not defined');
@@ -470,6 +487,7 @@ didDrawCell: function (data) {
                     status: 'Fixed',
                     item_id: apiData.item_id,
                     procedure: apiData.Procedure,
+                    price: numericTotal,
                     report_url: uploadResult.file_name
                 })
             });

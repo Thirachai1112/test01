@@ -164,6 +164,7 @@
                         <th>เลขสินค้า</th>
                         <th>หน่วยงาน</th>
                         <th>ปัญหา</th>
+                        <th>ค่าซ่อม (บาท)</th>
                         <th>ไฟล์</th>
                     </tr>
                 </thead>
@@ -248,6 +249,10 @@
                 const employeeName = repair.employee_name ? repair.employee_name.trim() : '-';
                 const employeeCode = repair.employees_code || '-';
                 const phoneNumber = repair.phone_number || '-';
+                const repairPrice = Number(repair.price);
+                const repairPriceText = Number.isFinite(repairPrice) && repairPrice >= 0
+                    ? repairPrice.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : '-';
                 
                 const row = `<tr>
                     <td>${start + index + 1}</td>
@@ -259,6 +264,7 @@
                     <td>${repair.asset_number || '-'}</td>
                     <td>${repair.affiliation || '-'}</td>
                     <td>${problemText}${repair.problem && repair.problem.length > 25 ? '...' : ''}</td>
+                    <td class="text-end">${repairPriceText}</td>
                     <td>${fileBadges}</td>
                 </tr>`;
                 tbody.innerHTML += row;

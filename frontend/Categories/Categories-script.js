@@ -56,6 +56,7 @@ function createItemCard(item) {
     const card = document.createElement('div');
     card.className = 'item-card';
     card.onclick = () => showItemDetails(item);
+    const canBorrow = item.status === 'Available';
 
     const imageUrl = item.image_url 
         ? `${API_BASE}/uploads/${item.image_url}`
@@ -91,8 +92,24 @@ function createItemCard(item) {
                 </div>
             </div>
             <span class="status-badge ${statusClass}">${statusText}</span>
+            <div class="item-actions">
+                <button type="button" class="item-borrow-btn ${canBorrow ? '' : 'disabled'}" ${canBorrow ? '' : 'disabled'}>
+                    <i class="fas fa-hand-holding"></i>
+                    ${canBorrow ? 'ยืมอุปกรณ์นี้' : 'ไม่พร้อมให้ยืม'}
+                </button>
+            </div>
         </div>
     `;
+
+    const borrowBtn = card.querySelector('.item-borrow-btn');
+    if (borrowBtn) {
+        borrowBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (!canBorrow) return;
+            const itemId = encodeURIComponent(String(item.item_id || ''));
+            window.location.href = `borrow.html?item_id=${itemId}`;
+        });
+    }
 
     return card;
 }

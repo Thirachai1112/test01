@@ -223,6 +223,30 @@
             border: 1px solid #fecaca;
         }
 
+        .due-date-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .due-date-wrap input {
+            flex: 1;
+        }
+
+        .calendar-trigger {
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            color: #111827;
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .calendar-trigger:hover {
+            background: #eef2f7;
+        }
+
         @media (max-width: 900px) {
             .page {
                 grid-template-columns: 1fr;
@@ -274,6 +298,7 @@
             <p class="form-subtitle">กรอกข้อมูลให้ครบ แล้วกดบันทึกเพื่อยืมอุปกรณ์</p>
 
             <form id="borrowForm">
+                <input type="hidden" id="client_tz_offset_minutes" name="client_tz_offset_minutes" value="0">
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="employees_code">รหัสพนักงาน *</label>
@@ -304,8 +329,13 @@
                         <textarea id="purpose" name="purpose"></textarea>
                     </div>
                     <div class="form-group full">
-                        <label for="note">หมายเหตุ</label>
-                        <textarea id="note" name="note"></textarea>
+                        <label for="return_due_date">กำหนดเวลาวันคืน</label>
+                        <div class="due-date-wrap">
+                            <input type="datetime-local" id="return_due_date" name="return_due_date" step="60">
+                            <button type="button" id="openDueDatePicker" class="calendar-trigger" aria-label="เปิดปฏิทินเลือกวันคืน">
+                                <i class="fas fa-calendar-alt"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group full">
                         <label for="files">แนบไฟล์ (สูงสุด 5 ไฟล์)</label>
@@ -331,9 +361,49 @@
         const form = document.getElementById('borrowForm');
         const messageBox = document.getElementById('formMessage');
 
+        // Support deep-link from item cards: borrow.html?item_id=123
+        const queryParams = new URLSearchParams(window.location.search);
+        const prefilledItemId = queryParams.get('item_id');
+        const itemIdInput = document.getElementById('item_id');
+        const returnDueDateInput = document.getElementById('return_due_date');
+        const openDueDatePickerBtn = document.getElementById('openDueDatePicker');
+        const clientTzOffsetInput = document.getElementById('client_tz_offset_minutes');
+
+        if (clientTzOffsetInput) {
+            clientTzOffsetInput.value = String(new Date().getTimezoneOffset());
+        }
+
+        const openDueDatePicker = () => {
+            if (!returnDueDateInput) return;
+            returnDueDateInput.focus();
+            if (typeof returnDueDateInput.showPicker === 'function') {
+                try {
+                    returnDueDateInput.showPicker();
+                } catch (error) {
+                    // Some browsers only allow showPicker during trusted user gestures.
+                }
+            }
+        };
+
+        if (openDueDatePickerBtn) {
+            openDueDatePickerBtn.addEventListener('click', openDueDatePicker);
+        }
+
+        if (returnDueDateInput) {
+            returnDueDateInput.addEventListener('click', openDueDatePicker);
+        }
+
+        if (prefilledItemId && itemIdInput) {
+            itemIdInput.value = prefilledItemId;
+        }
+
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             messageBox.style.display = 'none';
+
+            if (clientTzOffsetInput) {
+                clientTzOffsetInput.value = String(new Date().getTimezoneOffset());
+            }
 
             const formData = new FormData(form);
 

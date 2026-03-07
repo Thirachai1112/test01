@@ -263,6 +263,13 @@
         })();
     </script>
     <script>
+        (() => {
+            const script = document.createElement('script');
+            script.src = `quick-receipt-generator.js?v=${Date.now()}`;
+            document.head.appendChild(script);
+        })();
+    </script>
+    <script>
         async function loadRepairData() {
             try {
                 const searchText = document.getElementById('search-input')?.value?.trim() || '';
@@ -314,6 +321,8 @@
     }
 
     repairs.forEach((repair, index) => {
+        const repairMethod = repair.repair_method || repair.Procedure || '-';
+
         const date = new Date(repair.created_at).toLocaleDateString('th-TH', {
             day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
         });
@@ -358,10 +367,16 @@ if (repair.status === 'Pending') {
 
     // ส่งข้อมูล repair เข้าไปเพื่อใช้ในขั้นตอน Gen PDF
     actionButtons = `
-        <button class="btn btn-update shadow-sm text-success" 
-            onclick='finishRepair(${repair.repair_id}, ${safeItemId}, ${JSON.stringify(repair).replace(/'/g, "&apos;")})'>
-            ปิดงาน
-        </button>`;
+        <div class="d-flex flex-column flex-md-row gap-1 justify-content-center">
+            <button class="btn btn-update shadow-sm text-success"
+                onclick='finishRepair(${repair.repair_id}, ${safeItemId}, ${JSON.stringify(repair).replace(/'/g, "&apos;")})'>
+                ปิดงาน + ตจ.ป.61
+            </button>
+            <button class="btn btn-update shadow-sm text-danger"
+                onclick='quickFinishRepair(${repair.repair_id}, ${safeItemId}, ${JSON.stringify(repair).replace(/'/g, "&apos;")})'>
+                ปิดงานด่วน
+            </button>
+        </div>`;
 } else if (repair.status === 'Fixed') { 
             // ถ้าซ่อมเสร็จแล้ว และมีชื่อไฟล์รายงานใน report_url ให้แสดงปุ่มเปิด PDF
             actionButtons = `
@@ -390,7 +405,7 @@ if (repair.status === 'Pending') {
                 <td><code class="sn-code">${repair.asset_number || '-'}</code></td>
                 <td><span class="contract-code">${repair.contract_number || '-'}</span></td>
                 <td><div class="text-truncate" style="max-width: 150px;" title="${repair.problem}">${repair.problem}</div></td>
-                <td><div class="text-truncate" style="max-width: 150px;" title="${repair.Procedure || '-'}">${repair.Procedure || '-'}</div></td>
+                <td><div class="text-truncate" style="max-width: 150px;" title="${repairMethod}">${repairMethod}</div></td>
                 <td><small class="text-muted">${date}</small></td>
                 <td><span class="status-pill ${statusClass}">${statusText}</span></td>
                 <td>${fileHtml}</td>
@@ -454,6 +469,67 @@ async function finishRepair(repairId, itemId, repairData) {
             console.error("หาฟังก์ชัน handleFinishAndGeneratePDF ไม่เจอ ตรวจสอบการโหลดไฟล์ pdf-generator.js");
             Swal.fire('Error', 'ไม่สามารถเรียกใช้ระบบสร้าง PDF ได้', 'error');
         }
+    }
+}
+
+async function quickFinishRepair(repairId, itemId, repairData) {
+    const resolvedItemId = Number(itemId) || Number(repairData?.item_id) || null;
+    const defaultProcedure = String(repairData?.repair_method || repairData?.Procedure || '').trim();
+
+    const { value: repairProcedure } = await Swal.fire({
+        title: 'ปิดงานด่วน',
+        input: 'textarea',
+        inputLabel: 'สรุปผลการซ่อม (ไม่สร้าง PDF)',
+        inputPlaceholder: 'เช่น เปลี่ยนอะไหล่และทดสอบแล้วใช้งานได้ปกติ',
+        inputValue: defaultProcedure,
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยันปิดงาน',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc3545',
+        preConfirm: (value) => {
+            if (!value || !value.trim()) {
+                Swal.showValidationMessage('กรุณากรอกสรุปผลการซ่อมก่อนปิดงาน');
+            }
+            return value.trim();
+        }
+    });
+
+    if (!repairProcedure) return;
+
+    const finalData = {
+        ...repairData,
+        Procedure: repairProcedure,
+        repair_id: repairId,
+        item_id: (Number.isInteger(resolvedItemId) && resolvedItemId > 0) ? resolvedItemId : null
+    };
+
+    if (typeof handleQuickFinishAndGenerateReceipt === 'function') {
+        handleQuickFinishAndGenerateReceipt(finalData);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${ACTIVE_API_BASE}/api/repair/status/${repairId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status: 'Fixed',
+                item_id: finalData.item_id,
+                procedure: finalData.Procedure,
+                report_url: null
+            })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            throw new Error(errorBody.error || `HTTP ${res.status}`);
+        }
+
+        await Swal.fire('สำเร็จ', 'ปิดงานด่วนเรียบร้อยแล้ว', 'success');
+        loadRepairData();
+    } catch (error) {
+        console.error('Quick finish repair fallback error:', error);
+        Swal.fire('Error', `ปิดงานด่วนไม่สำเร็จ: ${error.message}`, 'error');
     }
 }
 
