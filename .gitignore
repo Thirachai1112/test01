@@ -9,3 +9,5 @@ generated_qrcodes/
 # ไฟล์ขยะของระบบปฏิบัติการ
 .DS_Store
 Thumbs.db
+.vercel
+.env*.local
