@@ -10,6 +10,7 @@
 
 ## สารบัญ
 - [ภาพรวมระบบ](#ภาพรวมระบบ)
+- [Vercel + Supabase Migration](#vercel--supabase-migration)
 - [โครงสร้างโปรเจกต์](#โครงสร้างโปรเจกต์)
 - [Requirements](#requirements)
 - [วิธีรันแบบ Docker (แนะนำ)](#วิธีรันแบบ-docker-แนะนำ)
@@ -34,6 +35,30 @@
 - Backend บนเครื่อง host: `5001` (แมปไปยัง container `5000`)
 
 > หมายเหตุ: ก่อนหน้านี้เคยใช้พอร์ต `3306` บน host แต่มีโอกาสชนกับ MySQL ตัวอื่นในเครื่อง จึงเปลี่ยนเป็น `13306`
+
+---
+
+## Vercel + Supabase Migration
+
+เริ่มต้นย้ายจาก Codespaces/Docker ไป Vercel ได้แล้วด้วยไฟล์:
+- `vercel.json`
+- `api/index.js`
+- `backend/.env.vercel.example`
+
+เอกสาร migration แบบเต็มอยู่ที่:
+- `docs/VERCEL_SUPABASE_MIGRATION.md`
+- `docs/VERCEL_DEPLOY_CHECKLIST.md`
+
+สคริปต์ตรวจหลัง deploy:
+- `scripts/check_vercel_env.sh`
+- `scripts/push_vercel_env.sh`
+- `scripts/deploy_vercel.sh`
+- `scripts/smoke_vercel.sh`
+
+ข้อควรทราบสำคัญ:
+- backend ปัจจุบันยังใช้ `mysql2` และ SQL แบบ MySQL
+- Supabase ใช้ PostgreSQL จึงต้องแปลง query/schema ก่อนใช้งานจริงเต็มรูปแบบ
+- ไฟล์ใน Vercel ไม่ควรเก็บถาวรบน local disk ให้ย้ายไป Supabase Storage
 
 ---
 

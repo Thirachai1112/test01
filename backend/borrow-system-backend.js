@@ -1,5 +1,4 @@
 const express = require('express');
-const mysql = require('mysql2');
 const multer = require('multer');
 const path = require('path');
 const app = express();
@@ -7,6 +6,14 @@ const fs = require('fs');
 const cors = require('cors');
 const QRCode = require('qrcode'); // ต้อง npm install qrcode ก่อน
 const { v4: uuidv4 } = require('uuid');
+const { createDatabaseClient, inferClientName } = require('./db-client');
+const {
+    useSupabaseStorage,
+    generateObjectName,
+    uploadBufferToSupabase,
+    deleteObjectIfExists,
+    getPublicObjectUrl
+} = require('./storage-adapter');
 require('dotenv').config(); // อย่าลืมสร้างไฟล์ .env เก็บค่ารหัสผ่านนะครับ
 
 
@@ -39,7 +46,9 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = useSupabaseStorage
+    ? multer({ storage: multer.memoryStorage() })
+    : multer({ storage: storage });
 
 // 2. ทำให้โฟลเดอร์ uploads เข้าถึงได้ผ่านเว็บ (Static Folder)
 app.use('/uploads/repairs', express.static(path.join(__dirname, 'uploads/repairs')));
@@ -54,10 +63,60 @@ app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, '..')));
 app.use(express.static(__dirname));
 
+if (useSupabaseStorage) {
+    const sendSupabaseObject = async (res, bucketType, objectName) => {
+        const publicUrl = getPublicObjectUrl(bucketType, objectName);
+        if (!publicUrl) return res.status(404).send('File not found');
+        return res.redirect(publicUrl);
+    };
+
+    app.get('/uploads/borrowing/:fileName', async (req, res) => sendSupabaseObject(res, 'borrowing', req.params.fileName));
+    app.get('/uploads/repairs/:fileName', async (req, res) => sendSupabaseObject(res, 'repairs', req.params.fileName));
+    app.get('/uploads/reports/:fileName', async (req, res) => sendSupabaseObject(res, 'reports', req.params.fileName));
+    app.get('/uploads/:fileName', async (req, res) => sendSupabaseObject(res, 'uploads', req.params.fileName));
+    app.get('/qrcodes/:fileName', async (req, res) => sendSupabaseObject(res, 'qrcodes', req.params.fileName));
+}
+
 const hasExistingImage = (fileName) => {
     if (!fileName) return null;
+    if (useSupabaseStorage) return true;
     const fullPath = path.join(__dirname, 'uploads', fileName);
     return fs.existsSync(fullPath);
+};
+
+const storeSingleFile = async (file, bucketType) => {
+    if (!file) return null;
+    if (!useSupabaseStorage) {
+        return {
+            fileName: file.filename,
+            originalName: file.originalname,
+            mimeType: file.mimetype
+        };
+    }
+
+    const objectName = generateObjectName(file.originalname || 'file');
+    await uploadBufferToSupabase({
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+        bucketType,
+        objectName
+    });
+
+    return {
+        fileName: objectName,
+        originalName: file.originalname,
+        mimeType: file.mimetype
+    };
+};
+
+const storeMultipleFiles = async (files = [], bucketType) => {
+    if (!Array.isArray(files) || files.length === 0) return [];
+    const storedFiles = [];
+    for (const file of files) {
+        const stored = await storeSingleFile(file, bucketType);
+        if (stored) storedFiles.push(stored);
+    }
+    return storedFiles;
 };
 
 const getPublicBaseUrl = (req) => {
@@ -80,16 +139,26 @@ const getPublicBaseUrl = (req) => {
 };
 
 const ensureQrCodeForItem = async (itemId, baseUrl) => {
-    const qrFolder = path.join(__dirname, 'generated_qrcodes');
-    if (!fs.existsSync(qrFolder)) {
-        fs.mkdirSync(qrFolder, { recursive: true });
-    }
-
     const qrFileName = `qr_${itemId}.png`;
-    const qrPath = path.join(qrFolder, qrFileName);
-
     const qrData = `${baseUrl}/testqr.html?id=${itemId}`;
-    await QRCode.toFile(qrPath, qrData);
+
+    if (useSupabaseStorage) {
+        const qrBuffer = await QRCode.toBuffer(qrData, { type: 'png' });
+        await uploadBufferToSupabase({
+            buffer: qrBuffer,
+            mimeType: 'image/png',
+            bucketType: 'qrcodes',
+            objectName: qrFileName
+        });
+    } else {
+        const qrFolder = path.join(__dirname, 'generated_qrcodes');
+        if (!fs.existsSync(qrFolder)) {
+            fs.mkdirSync(qrFolder, { recursive: true });
+        }
+
+        const qrPath = path.join(qrFolder, qrFileName);
+        await QRCode.toFile(qrPath, qrData);
+    }
 
     return `/qrcodes/${qrFileName}`;
 };
@@ -103,62 +172,45 @@ const DB_PORT = Number(process.env.DB_PORT) || 3306;
 const DB_USER = process.env.DB_USER || 'root';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'password123';
 const DB_NAME = process.env.DB_NAME || 'my_database';
+const DB_CLIENT = inferClientName(process.env.DB_CLIENT || 'mysql');
+const DATABASE_URL = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || '';
 
-const db = mysql.createPool({
+const db = createDatabaseClient({
+    client: DB_CLIENT,
     host: DB_HOST,
     port: DB_PORT,
     user: DB_USER,
     password: DB_PASSWORD,
     database: DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10
+    connectionString: DATABASE_URL,
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT) || 10,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 });
 
-const toUtcMySqlDateTime = (inputValue, clientOffsetMinutes) => {
-    const raw = String(inputValue || '').trim();
-    if (!raw) return null;
+console.log(`Database client mode: ${DB_CLIENT}`);
 
-    let parsed = null;
-    const localDateTimeMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
-    const offset = Number(clientOffsetMinutes);
-    const hasClientOffset = Number.isFinite(offset);
+const LIKE_OPERATOR = DB_CLIENT === 'postgres' ? 'ILIKE' : 'LIKE';
+const EMPLOYEE_FULL_NAME_EXPR = DB_CLIENT === 'postgres'
+    ? "(e.first_name || ' ' || e.last_name)"
+    : "concat(e.first_name, ' ', e.last_name)";
+const EMPLOYEE_FULL_NAME_EXPR_UPPER = DB_CLIENT === 'postgres'
+    ? "(employees.first_name || ' ' || employees.last_name)"
+    : "CONCAT(employees.first_name, ' ', employees.last_name)";
+const FILE_PATHS_AGG_EXPR = DB_CLIENT === 'postgres'
+    ? "string_agg(file_path::text, ',')"
+    : 'GROUP_CONCAT(file_path)';
 
-    if (localDateTimeMatch && hasClientOffset) {
-        const year = Number(localDateTimeMatch[1]);
-        const month = Number(localDateTimeMatch[2]);
-        const day = Number(localDateTimeMatch[3]);
-        const hour = Number(localDateTimeMatch[4]);
-        const minute = Number(localDateTimeMatch[5]);
-        const second = Number(localDateTimeMatch[6] || '0');
-
-        // getTimezoneOffset format: UTC - local (e.g. Thailand = -420)
-        const utcMillis = Date.UTC(year, month - 1, day, hour, minute, second) + (offset * 60 * 1000);
-        parsed = new Date(utcMillis);
-    } else {
-        const fallbackParsed = new Date(raw);
-        if (!Number.isNaN(fallbackParsed.getTime())) {
-            parsed = fallbackParsed;
-        }
+app.post('/api/upload-report', upload.single('report_file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+        const storedFile = await storeSingleFile(req.file, 'reports');
+        res.json({
+            success: true,
+            file_name: storedFile.fileName
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
     }
-
-    if (!parsed || Number.isNaN(parsed.getTime())) return null;
-
-    const y = parsed.getUTCFullYear();
-    const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getUTCDate()).padStart(2, '0');
-    const hh = String(parsed.getUTCHours()).padStart(2, '0');
-    const mm = String(parsed.getUTCMinutes()).padStart(2, '0');
-    const ss = String(parsed.getUTCSeconds()).padStart(2, '0');
-
-    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
-};
-
-app.post('/api/upload-report', upload.single('report_file'), (req, res) => {
-    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    res.json({
-        success: true,
-        file_name: req.file.filename
-    });
 });
 
 app.get('/items', (req, res) => {
@@ -170,7 +222,7 @@ app.get('/items', (req, res) => {
     // กรองสถานะที่ถูกลบออก และค้นหาตามชื่อ/เลขสัญญา/Serial Number
     const searchCondition = `
         WHERE items.status NOT IN ('Deleted', 'Maintenance')
-        AND (items.item_name LIKE ? OR items.contract_number LIKE ? OR items.serial_number LIKE ? OR items.asset_number LIKE ?)
+        AND (items.item_name ${LIKE_OPERATOR} ? OR items.contract_number ${LIKE_OPERATOR} ? OR items.serial_number ${LIKE_OPERATOR} ? OR items.asset_number ${LIKE_OPERATOR} ?)
     `;
     const searchParams = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
 
@@ -289,9 +341,16 @@ app.get('/items', (req, res) => {
 // สิ่งที่ต้องทำ: เพิ่มข้อมูลลง borrowing_logs และ เปลี่ยนสถานะไอเทมเป็น 'Borrowed'
 // API สำหรับการยืมอุปกรณ์
 // เพิ่ม upload.array('files', 5) เพื่อรับไฟล์ (สูงสุด 5 ไฟล์)
-app.post('/borrow', upload.array('files', 5), (req, res) => {
-    const { first_name, last_name, employees_code, phone_number, affiliation, item_id, note, purpose, return_due_date, client_tz_offset_minutes } = req.body;
+app.post('/borrow', upload.array('files', 5), async (req, res) => {
+    const { first_name, last_name, employees_code, phone_number, affiliation, item_id, note, purpose } = req.body;
     const uploadedFiles = req.files; // ไฟล์จะถูกเก็บไว้ในตัวแปรนี้
+    let storedBorrowFiles = [];
+
+    try {
+        storedBorrowFiles = await storeMultipleFiles(uploadedFiles, 'borrowing');
+    } catch (error) {
+        return res.status(500).json({ error: `อัปโหลดไฟล์ไม่สำเร็จ: ${error.message}` });
+    }
 
     if (!employees_code || !item_id) {
         return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน (รหัสพนักงาน หรือ ID อุปกรณ์)" });
@@ -328,18 +387,8 @@ app.post('/borrow', upload.array('files', 5), (req, res) => {
                     return res.status(400).json({ error: "อุปกรณ์นี้ถูกยืมไปแล้ว" });
                 }
 
-                const normalizedDueDate = String(return_due_date || '').trim();
-                const dueDateForDb = normalizedDueDate
-                    ? toUtcMySqlDateTime(normalizedDueDate, client_tz_offset_minutes)
-                    : null;
-
-                if (normalizedDueDate && !dueDateForDb) {
-                    return res.status(400).json({ error: 'รูปแบบกำหนดเวลาวันคืนไม่ถูกต้อง' });
-                }
-                const finalNote = note || 'ยืมผ่านระบบ';
-                const sqlLog = "INSERT INTO borrowing_logs (employee_id, item_id, note, purpose, borrow_date, return_due_date) VALUES (?, ?, ?, ?, NOW(), ?)";
-
-                db.query(sqlLog, [empId, item_id, finalNote, purpose || null, dueDateForDb], (logErr, logResult) => {
+                const sqlLog = "INSERT INTO borrowing_logs (employee_id, item_id, note, purpose, borrow_date) VALUES (?, ?, ?, ?, NOW())";
+                db.query(sqlLog, [empId, item_id, note || 'ยืมผ่านระบบ', purpose || null], (logErr, logResult) => {
                     if (logErr) {
                         console.error("SQL Log Error:", logErr);
                         return res.status(500).json({ error: "บันทึกประวัติล้มเหลว" });
@@ -348,12 +397,12 @@ app.post('/borrow', upload.array('files', 5), (req, res) => {
                     const logId = logResult.insertId; // ดึง log_id เพื่อใช้เชื่อมกับไฟล์
 
                     // --- ส่วนเพิ่ม: บันทึกข้อมูลไฟล์ลงตาราง borrowing_files ---
-                    if (uploadedFiles && uploadedFiles.length > 0) {
-                        const fileValues = uploadedFiles.map(file => [
+                    if (storedBorrowFiles.length > 0) {
+                        const fileValues = storedBorrowFiles.map(file => [
                             logId, // ใช้ log_id จาก borrowing_logs
-                            file.originalname,
-                            `/uploads/borrowing/${file.filename}`,
-                            file.mimetype
+                            file.originalName,
+                            `/uploads/borrowing/${file.fileName}`,
+                            file.mimeType
                         ]);
 
                         const sqlFile = "INSERT INTO borrowing_files (log_id, file_name, file_path, file_type) VALUES ?";
@@ -450,7 +499,7 @@ app.get('/history', (req, res) => {
     const sql = `
         SELECT 
             l.log_id,
-            concat(e.first_name, ' ', e.last_name) AS employee_full_name,
+            ${EMPLOYEE_FULL_NAME_EXPR} AS employee_full_name,
             i.item_name,
             i.asset_number,
             l.borrow_date,
@@ -508,10 +557,10 @@ app.get('/employees/search', (req, res) => {
     // ค้นหาจากชื่อ, นามสกุล หรือรหัสพนักงาน
     const sql = `
         SELECT * FROM employees 
-        WHERE first_name LIKE ? 
-        OR last_name LIKE ? 
-        OR employees_code LIKE ?
-        OR Affiliation LIKE ?
+        WHERE first_name ${LIKE_OPERATOR} ? 
+        OR last_name ${LIKE_OPERATOR} ? 
+        OR employees_code ${LIKE_OPERATOR} ?
+        OR Affiliation ${LIKE_OPERATOR} ?
     `;
 
     const values = [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`];
@@ -574,7 +623,7 @@ app.get('/api/qrcode/:itemId', (req, res) => {
 
 
 // 8.API สำหรับเพิ่มอุปกรณ์ใหม่พร้อมรูปภาพ
-app.post('/add-item', upload.single('image'), (req, res) => {
+app.post('/add-item', upload.single('image'), async (req, res) => {
     if (!req.body) {
         return res.status(400).json({ error: "ไม่ได้รับข้อมูลจาก Form" });
     }
@@ -585,7 +634,15 @@ app.post('/add-item', upload.single('image'), (req, res) => {
         return res.status(400).json({ error: "กรุณาระบุชื่ออุปกรณ์" });
     }
 
-    const image_url = req.file ? req.file.filename : null;
+    let image_url = null;
+    if (req.file) {
+        try {
+            const storedImage = await storeSingleFile(req.file, 'uploads');
+            image_url = storedImage.fileName;
+        } catch (error) {
+            return res.status(500).json({ error: `อัปโหลดรูปภาพไม่สำเร็จ: ${error.message}` });
+        }
+    }
     const final_cat_id = (cat_id && cat_id !== '') ? cat_id : 4;
 
     const sql = `INSERT INTO items 
@@ -636,7 +693,7 @@ app.post('/add-item', upload.single('image'), (req, res) => {
 });
 
 // 9.API สำหรับอัปเดตรูปให้อุปกรณ์ (ใช้ item_id เป็นตัวอ้างอิง)
-app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
+app.put('/update-item-all/:item_id', upload.single('image'), async (req, res) => {
     const { item_id } = req.params;
 
     // 1. รับค่าจาก Body
@@ -649,13 +706,23 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
         status
     } = req.body;
 
-    const newImage = req.file ? req.file.filename : null;
+    let newImage = null;
+    if (req.file) {
+        try {
+            const storedImage = await storeSingleFile(req.file, 'uploads');
+            newImage = storedImage.fileName;
+        } catch (error) {
+            return res.status(500).json({ error: `อัปโหลดรูปภาพไม่สำเร็จ: ${error.message}` });
+        }
+    }
 
     // 2. ตรวจสอบข้อมูลเดิม
     db.query("SELECT * FROM items WHERE item_id = ?", [item_id], (err, results) => {
         if (err) return res.status(500).json(err);
         if (results.length === 0) {
-            if (req.file) fs.unlinkSync(req.file.path);
+            if (!useSupabaseStorage && req.file?.path && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
             return res.status(404).json({ error: "ไม่พบอุปกรณ์ ID นี้" });
         }
 
@@ -699,9 +766,13 @@ app.put('/update-item-all/:item_id', upload.single('image'), (req, res) => {
 
             // 5. จัดการรูปภาพเก่า
             if (newImage && currentData.image_url && currentData.image_url !== 'default_device.png') {
-                const oldPath = path.join(__dirname, 'uploads', currentData.image_url);
-                if (fs.existsSync(oldPath)) {
-                    fs.unlinkSync(oldPath);
+                if (useSupabaseStorage) {
+                    deleteObjectIfExists('uploads', currentData.image_url).catch(() => null);
+                } else {
+                    const oldPath = path.join(__dirname, 'uploads', currentData.image_url);
+                    if (fs.existsSync(oldPath)) {
+                        fs.unlinkSync(oldPath);
+                    }
                 }
             }
 
@@ -758,18 +829,17 @@ app.get('/borrowing-logs', (req, res) => {
             logs.*, 
             items.item_name, 
             items.serial_number,
-            CONCAT(employees.first_name, ' ', employees.last_name) AS employee_name,
-            employees.phone_number AS employee_phone,
+            ${EMPLOYEE_FULL_NAME_EXPR_UPPER} AS employee_name,
             employees.Affiliation,
-            -- ส่วนที่เพิ่ม: รวม Path ไฟล์ทั้งหมดที่ผูกกับ log_id นี้เข้าด้วยกัน แยกด้วยเครื่องหมายคอมม่า (,)
-            GROUP_CONCAT(files.file_path) AS file_paths
+            files_agg.file_paths
         FROM borrowing_logs logs
         LEFT JOIN items ON logs.item_id = items.item_id
         LEFT JOIN employees ON logs.employee_id = employees.id 
-        -- เชื่อมกับตารางไฟล์
-        LEFT JOIN borrowing_files files ON logs.log_id = files.log_id
-        -- ต้องทำ GROUP BY เพื่อไม่ให้แถวข้อมูลซ้ำเมื่อมีหลายไฟล์
-        GROUP BY logs.log_id
+        LEFT JOIN (
+            SELECT log_id, ${FILE_PATHS_AGG_EXPR} AS file_paths
+            FROM borrowing_files
+            GROUP BY log_id
+        ) files_agg ON logs.log_id = files_agg.log_id
         ORDER BY logs.borrow_date DESC
     `;
 
@@ -822,7 +892,7 @@ app.post('/admin/login', (req, res) => {
 });
 
 
-app.post('/api/repair', upload.array('files', 5), (req, res) => {
+app.post('/api/repair', upload.array('files', 5), async (req, res) => {
     const {
         brand, contract_number, serial_number, asset_number,
         affiliation, problem, item_id,
@@ -834,9 +904,16 @@ app.post('/api/repair', upload.array('files', 5), (req, res) => {
     const normalizeLookupValue = (value = '') => value.toString().trim().toLowerCase().replace(/[\s\-_]/g, '');
 
     const uploadedFiles = req.files;
+    let storedRepairFiles = [];
+    try {
+        storedRepairFiles = await storeMultipleFiles(uploadedFiles, 'repairs');
+    } catch (error) {
+        return res.status(500).json({ success: false, message: `อัปโหลดไฟล์แจ้งซ่อมไม่สำเร็จ: ${error.message}` });
+    }
+
     // รวมชื่อไฟล์หลายๆ ไฟล์คั่นด้วยคอมมา
-    const filePaths = uploadedFiles && uploadedFiles.length > 0
-        ? uploadedFiles.map(file => file.filename).join(',')
+    const filePaths = storedRepairFiles.length > 0
+        ? storedRepairFiles.map(file => file.fileName).join(',')
         : null;
 
     const saveRepairData = (resolvedItemId, empId, empName, empCode, empPhone) => {
@@ -844,56 +921,30 @@ app.post('/api/repair', upload.array('files', 5), (req, res) => {
         const finalCode = empCode || employees_code || '-';
         const finalPhone = empPhone || phone_number || '-';
 
-        db.query(
-            `SELECT COLUMN_NAME
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'repair'`,
-            [DB_NAME],
-            (columnErr, columnRows) => {
-                if (columnErr) {
-                    console.error('❌ Column Check Error:', columnErr.message);
-                    return res.status(500).json({ success: false, message: columnErr.message });
-                }
+        // ปรับชื่อตารางเป็น repairs (มี s) และชื่อคอลัมน์ให้ตรงตามที่คุณต้องการดึง
+        const sql = `INSERT INTO repair (
+            brand, contract_number, serial_number, asset_number, 
+            affiliation, problem, repair_url, employee_id, 
+            employee_name, employees_code, phone_number, item_id, 
+            status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())`;
 
-                const repairColumns = new Set(columnRows.map((row) => row.COLUMN_NAME));
-                const fieldMap = {
-                    brand,
-                    contract_number,
-                    serial_number,
-                    asset_number,
-                    affiliation,
-                    problem,
-                    repair_url: filePaths,
-                    employee_id: empId,
-                    employee_name: finalName,
-                    employees_code: finalCode,
-                    phone_number: finalPhone,
-                    item_id: resolvedItemId,
-                    status: 'Pending',
-                    created_at: new Date()
-                };
+        const values = [
+            brand, contract_number, serial_number, asset_number,
+            affiliation, problem, filePaths, empId,
+            finalName, finalCode, finalPhone, resolvedItemId
+        ];
 
-                const insertColumns = Object.keys(fieldMap).filter((col) => repairColumns.has(col));
-                if (insertColumns.length === 0) {
-                    return res.status(500).json({ success: false, message: 'ไม่พบคอลัมน์ที่รองรับสำหรับบันทึก repair' });
-                }
-
-                const placeholders = insertColumns.map(() => '?').join(', ');
-                const insertSql = `INSERT INTO repair (${insertColumns.map((col) => `\`${col}\``).join(', ')}) VALUES (${placeholders})`;
-                const values = insertColumns.map((col) => fieldMap[col]);
-
-                db.query(insertSql, values, (err) => {
-                    if (err) {
-                        console.error("❌ SQL Error:", err.message);
-                        return res.status(500).json({ success: false, message: err.message });
-                    }
-                    if (resolvedItemId) {
-                        db.query("UPDATE items SET status = 'Maintenance' WHERE item_id = ?", [resolvedItemId]);
-                    }
-                    res.status(201).json({ success: true, message: "แจ้งซ่อมสำเร็จ" });
-                });
+        db.query(sql, values, (err, result) => {
+            if (err) {
+                console.error("❌ SQL Error:", err.message);
+                return res.status(500).json({ success: false, message: err.message });
             }
-        );
+            if (resolvedItemId) {
+                db.query("UPDATE items SET status = 'Maintenance' WHERE item_id = ?", [resolvedItemId]);
+            }
+            res.status(201).json({ success: true, message: "แจ้งซ่อมสำเร็จ" });
+        });
     };
 
     const resolveItemId = (callback) => {
@@ -934,7 +985,7 @@ app.post('/api/repair', upload.array('files', 5), (req, res) => {
     resolveItemId((resolvedItemId) => {
         if (resolvedItemId) {
             const getEmployeeSql = `
-                SELECT e.id, CONCAT(e.first_name, ' ', e.last_name) AS full_name, e.employees_code, e.phone_number 
+                SELECT e.id, ${EMPLOYEE_FULL_NAME_EXPR} AS full_name, e.employees_code, e.phone_number 
                 FROM borrowing_logs bl 
                 JOIN employees e ON bl.employee_id = e.id 
                 WHERE bl.item_id = ? 
@@ -976,16 +1027,7 @@ app.get('/api/repair', (req, res) => {
             }
 
             const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
-            const canonical = (name = '') => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-            const findColumnByCanonical = (candidates) => {
-                const canonicalCandidates = new Set(candidates.map(canonical));
-                return Array.from(repairColumns).filter((col) => canonicalCandidates.has(canonical(col)));
-            };
-            const escapeIdentifier = (name) => `\`${String(name).replace(/`/g, '``')}\``;
-            const repairMethodColumns = findColumnByCanonical(['Repair methods', 'repair_methods', 'repair_method', 'Procedure']);
-            const hasEmployeeIdColumn = repairColumns.has('employee_id');
-            const hasItemIdColumn = repairColumns.has('item_id');
-            const hasPriceColumn = repairColumns.has('price');
+            const hasProcedureColumn = repairColumns.has('Procedure');
 
             const searchableFields = [
                 'r.brand',
@@ -998,16 +1040,12 @@ app.get('/api/repair', (req, res) => {
                 'r.affiliation'
             ];
 
-            if (repairMethodColumns.length > 0) {
-                searchableFields.push(...repairMethodColumns.map((col) => `r.${escapeIdentifier(col)}`));
-            }
-
-            if (hasPriceColumn) {
-                searchableFields.push('CAST(r.price AS CHAR)');
+            if (hasProcedureColumn) {
+                searchableFields.push('r.`Procedure`');
             }
 
             const searchCondition = search
-                ? ` WHERE ${searchableFields.map(field => `${field} LIKE ?`).join(' OR ')}`
+                ? ` WHERE ${searchableFields.map(field => `${field} ${LIKE_OPERATOR} ?`).join(' OR ')}`
                 : '';
 
             const searchParams = search
@@ -1035,17 +1073,8 @@ app.get('/api/repair', (req, res) => {
                     contract_number: 'r.contract_number'
                 };
 
-                if (hasPriceColumn) {
-                    sortableFields.price = 'r.price';
-                }
-
                 const orderByField = sortableFields[sortBy] || 'r.repair_id';
-                const repairMethodSelect = repairMethodColumns.length > 0
-                    ? `COALESCE(${repairMethodColumns.map((col) => `r.${escapeIdentifier(col)}`).join(', ')})`
-                    : 'NULL';
-                const itemIdSelect = hasItemIdColumn ? 'r.item_id' : 'NULL AS item_id';
-                const priceSelect = hasPriceColumn ? 'r.price' : 'NULL AS price';
-                const employeeJoinCondition = hasEmployeeIdColumn ? 'r.employee_id = e.id' : '1 = 0';
+                const procedureSelect = hasProcedureColumn ? 'r.`Procedure`' : 'NULL AS `Procedure`';
 
                 const sql = `
                     SELECT 
@@ -1059,15 +1088,13 @@ app.get('/api/repair', (req, res) => {
                         r.repair_url,
                         r.created_at,
                         r.updated_at,
-                        ${itemIdSelect},
-                        ${repairMethodSelect} AS repair_method,
-                        ${repairMethodSelect} AS \`Procedure\`,
-                        ${priceSelect},
-                        COALESCE(r.employee_name, CONCAT(e.first_name, ' ', e.last_name)) AS employee_name,
+                        r.item_id,
+                        ${procedureSelect},
+                        COALESCE(r.employee_name, ${EMPLOYEE_FULL_NAME_EXPR}) AS employee_name,
                         COALESCE(r.employees_code, e.employees_code) AS employees_code,
                         COALESCE(r.phone_number, e.phone_number) AS phone_number
                     FROM repair r
-                    LEFT JOIN employees e ON ${employeeJoinCondition}
+                    LEFT JOIN employees e ON r.employee_id = e.id
                     ${searchCondition}
                     ORDER BY ${orderByField} ${sortOrder}
                     LIMIT ? OFFSET ?
@@ -1122,16 +1149,6 @@ app.get('/api/repair-management', (req, res) => {
             }
 
             const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
-            const canonical = (name = '') => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-            const findColumnByCanonical = (candidates) => {
-                const canonicalCandidates = new Set(candidates.map(canonical));
-                return Array.from(repairColumns).filter((col) => canonicalCandidates.has(canonical(col)));
-            };
-            const escapeIdentifier = (name) => `\`${String(name).replace(/`/g, '``')}\``;
-            const repairMethodColumns = findColumnByCanonical(['Repair methods', 'repair_methods', 'repair_method', 'Procedure']);
-            const repairMethodSelect = repairMethodColumns.length > 0
-                ? `COALESCE(${repairMethodColumns.map((col) => escapeIdentifier(col)).join(', ')}) AS repair_method`
-                : 'NULL AS repair_method';
             const selectExpr = (name, alias = null) => {
                 if (!repairColumns.has(name)) {
                     return alias ? `NULL AS ${alias}` : `NULL AS \`${name}\``;
@@ -1158,8 +1175,7 @@ app.get('/api/repair-management', (req, res) => {
                     ${selectExpr('created_at')},
                     ${selectExpr('finished_at')},
                     ${selectExpr('repair_url')},
-                    ${selectExpr('Procedure')},
-                    ${repairMethodSelect}
+                    ${selectExpr('Procedure')}
                 FROM repair
                 WHERE status != 'Fixed'
                 ORDER BY created_at DESC
@@ -1225,22 +1241,14 @@ app.get('/api/repair-status', (req, res) => {
             }
 
             const repairColumns = new Set(columnRows.map(row => row.COLUMN_NAME));
-            const canonical = (name = '') => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-            const findColumnByCanonical = (candidates) => {
-                const canonicalCandidates = new Set(candidates.map(canonical));
-                return Array.from(repairColumns).filter((col) => canonicalCandidates.has(canonical(col)));
-            };
-            const escapeIdentifier = (name) => `\`${String(name).replace(/`/g, '``')}\``;
-            const repairMethodColumns = findColumnByCanonical(['Repair methods', 'repair_methods', 'repair_method', 'Procedure']);
-            const itemIdSelect = repairColumns.has('item_id') ? 'item_id' : 'NULL AS item_id';
-            const repairMethodSelect = repairMethodColumns.length > 0
-                ? `COALESCE(${repairMethodColumns.map((col) => escapeIdentifier(col)).join(', ')})`
-                : 'NULL';
+            const procedureSelect = repairColumns.has('Procedure')
+                ? '`Procedure`'
+                : 'NULL AS `Procedure`';
 
             const sql = `
                 SELECT 
                     repair_id, 
-                    ${itemIdSelect}, 
+                    item_id, 
                     brand, 
                     asset_number, 
                     serial_number, 
@@ -1253,8 +1261,7 @@ app.get('/api/repair-status', (req, res) => {
                     status, 
                     created_at, 
                     repair_url,
-                    ${repairMethodSelect} AS repair_method,
-                    ${repairMethodSelect} AS \`Procedure\`
+                    ${procedureSelect}
                 FROM repair
                 WHERE ${whereClauses.join(' AND ')}
                 ORDER BY created_at DESC
@@ -1276,12 +1283,7 @@ app.get('/api/repair-status', (req, res) => {
 // ปรับปรุง API อัปเดตสถานะการซ่อม
 app.put('/api/repair/status/:id', async (req, res) => {
     const repairId = req.params.id;
-    const { status, item_id, procedure, repair_method, report_url, price } = req.body;
-    const methodValueRaw = procedure ?? repair_method;
-    const normalizedMethodValue = (typeof methodValueRaw === 'string') ? methodValueRaw.trim() : methodValueRaw;
-    const hasPriceInPayload = Object.prototype.hasOwnProperty.call(req.body, 'price');
-    const numericPriceRaw = Number(String(price ?? '').replace(/,/g, ''));
-    const normalizedPrice = Number.isFinite(numericPriceRaw) ? Math.round(numericPriceRaw) : null;
+    const { status, item_id, procedure, report_url } = req.body;
 
     // --- 1. กรณีอัปเดตสถานะทั่วไป (เช่น กดรับงาน 'In Progress') ---
     if (status !== 'Fixed') {
@@ -1298,32 +1300,12 @@ app.put('/api/repair/status/:id', async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const [repairColumnRows] = await connection.query(`
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'repair'
-        `);
-        const repairColumns = new Set(repairColumnRows.map(row => row.COLUMN_NAME));
-        const canonical = (name = '') => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-        const findColumnByCanonical = (candidates) => {
-            const canonicalCandidates = new Set(candidates.map(canonical));
-            return Array.from(repairColumns).filter((col) => canonicalCandidates.has(canonical(col)));
-        };
-
         // ก. ตรวจสอบข้อมูลใบแจ้งซ่อม
-        const repairSelectFields = ['problem', 'serial_number', 'asset_number', 'contract_number'];
-        if (repairColumns.has('item_id')) {
-            repairSelectFields.push('item_id');
-        }
-        const [repairRows] = await connection.query(
-            `SELECT ${repairSelectFields.join(', ')} FROM repair WHERE repair_id = ?`,
-            [repairId]
-        );
+        const [repairRows] = await connection.query("SELECT problem, item_id, serial_number, asset_number, contract_number FROM repair WHERE repair_id = ?", [repairId]);
         if (repairRows.length === 0) throw new Error('ไม่พบข้อมูลใบแจ้งซ่อม');
 
         const requestItemId = Number(item_id);
-        const repairItemId = repairColumns.has('item_id') ? Number(repairRows[0].item_id) : null;
+        const repairItemId = Number(repairRows[0].item_id);
         let resolvedItemId = Number.isInteger(requestItemId) && requestItemId > 0
             ? requestItemId
             : (Number.isInteger(repairItemId) && repairItemId > 0 ? repairItemId : null);
@@ -1407,9 +1389,7 @@ app.put('/api/repair/status/:id', async (req, res) => {
 
                 if (!archiveSkipReason) {
                     // ค. ตัดความสัมพันธ์ก่อนลบ item ออกจากคลังหลัก
-                    if (repairColumns.has('item_id')) {
-                        await connection.query("UPDATE repair SET item_id = NULL WHERE repair_id = ?", [repairId]);
-                    }
+                    await connection.query("UPDATE repair SET item_id = NULL WHERE repair_id = ?", [repairId]);
 
                     const [activeBorrowRows] = await connection.query(
                         "SELECT log_id FROM borrowing_logs WHERE item_id = ? AND return_date IS NULL LIMIT 1",
@@ -1427,26 +1407,26 @@ app.put('/api/repair/status/:id', async (req, res) => {
             }
         }
 
-            // ง. อัปเดตตาราง repair (รองรับทั้งคอลัมน์ Repair methods และ Procedure)
-            const escapeIdentifier = (name) => `\`${String(name).replace(/`/g, '``')}\``;
-            const repairMethodColumns = findColumnByCanonical(['Repair methods', 'repair_methods', 'repair_method', 'Procedure']);
+        // ง. อัปเดตตาราง repair (รองรับกรณีไม่มีคอลัมน์ Procedure)
+        const [repairColumnRows] = await connection.query(`
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'repair'
+        `);
+        const repairColumns = new Set(repairColumnRows.map(row => row.COLUMN_NAME));
 
         const updateFields = ["status = 'Fixed'"];
         const updateParams = [];
 
-        for (const methodCol of repairMethodColumns) {
-            updateFields.push(`${escapeIdentifier(methodCol)} = ?`);
-            updateParams.push(normalizedMethodValue || null);
+        if (repairColumns.has('Procedure')) {
+            updateFields.push("\`Procedure\` = ?");
+            updateParams.push(procedure || null);
         }
 
         if (repairColumns.has('report_url')) {
             updateFields.push("report_url = ?");
             updateParams.push(report_url || null);
-        }
-
-        if (repairColumns.has('price') && hasPriceInPayload) {
-            updateFields.push("price = ?");
-            updateParams.push(normalizedPrice);
         }
 
         if (repairColumns.has('finished_at')) {
@@ -1592,7 +1572,12 @@ app.get('/api/repair-items', (req, res) => {
 });
 
 const PORT = Number(process.env.PORT) || 5000;
-console.log(`Preparing server on port ${PORT}`);
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+
+if (require.main === module) {
+    console.log(`Preparing server on port ${PORT}`);
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+module.exports = app;

@@ -5,6 +5,7 @@ uploads/
 backend/.env
 backend/.env.local
 generated_qrcodes/
+.vercel/
 # ไฟล์ขยะของระบบปฏิบัติการ
 .DS_Store
 Thumbs.db
