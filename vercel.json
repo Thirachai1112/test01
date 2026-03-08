@@ -6,14 +6,14 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/$",
-      "dest": "/Default.html"
+      "source": "/",
+      "destination": "/Default.html"
     },
     {
-      "src": "^/api/(.*)$",
-      "dest": "/api/index.js"
+      "source": "/api/:path*",
+      "destination": "/api/index.js"
     }
   ]
 }
