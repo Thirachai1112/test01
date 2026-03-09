@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบยืม-คืนอุปกรณ์ | Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Kanit', sans-serif;
+            /* ส่วนการตั้งค่ารูปพื้นหลัง */
+            background-image: url('1041uuu-04.gif'); /* <-- เปลี่ยนชื่อไฟล์รูปภาพของคุณตรงนี้ */
+            background-size: cover; /* ทำให้รูปภาพครอบคลุมทั้งหน้าจอ */
+            background-position: center; /* จัดตำแหน่งรูปภาพให้อยู่ตรงกลาง */
+            
+            
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* เอฟเฟกต์กระจกฝ้า (Glassmorphism) เพื่อให้ข้อความอ่านง่ายบนรูปภาพ */
+        .portal-container {
+            text-align: center;
+            background: rgba(150, 156, 211, 0.8); /* สีขาวโปร่งแสง */
+            padding: 50px;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(8px); /* ทำให้พื้นหลังเบลอเล็กน้อย */
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #264653;
+            margin-bottom: 5px;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 35px;
+            font-size: 1rem;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .btn-portal {
+            padding: 18px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: white;
+            font-weight: 500;
+            display: block;
+        }
+
+        /* สีพาสเทลตามสไตล์ที่คุณชอบ */
+        .btn-admin { background-color: #5ebedb; }  
+        .btn-categories { background-color: #c0dd8d; } 
+        .btn-repair { background-color: #EA7B7B; } 
+
+        .btn-portal:hover {
+            transform: scale(1.05);
+            filter: brightness(0.9);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-container">
+        <h1>ระบบยืม-คืนอุปกรณ์</h1>
+        <div class="subtitle">(Device Borrowing System)</div>
+
+        <div class="button-group">
+            <a href="/frontend/Categories/Categories.html" class="btn-portal btn-categories">
+                📦 รายการอุปกรณ์ (Categories)
+            </a>
+            <a href="/frontend/Repair/Repair_request.html#" class="btn-portal btn-repair">
+                🛠️ แจ้งซ่อมอุปกรณ์ (Repair Request)
+            </a>
+            <a href="login.html" class="btn-portal btn-admin">
+                👤 ผู้ดูแลระบบ (Admin)
+            </a>
+             
+            
+            
+        </div>
+    </div>
+     
+    
+</body>
+</html>
