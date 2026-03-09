@@ -10,7 +10,7 @@
     },
     {
       "src": "^/$",
-      "dest": "/Default.html"
+      "dest": "/index.html"
     }
   ]
 }
