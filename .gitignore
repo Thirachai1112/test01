@@ -1,13 +1,39 @@
 node_modules/
+backend/node_modules/
+frontend/node_modules/
 uploads/
+public/uploads/
+backend/uploads/
 !.gitkeep
 .env
 backend/.env
 backend/.env.local
 generated_qrcodes/
+backend/generated_qrcodes/
 .vercel/
 # ไฟล์ขยะของระบบปฏิบัติการ
 .DS_Store
 Thumbs.db
 .vercel
 .env*.local
+# Build
+/dist
+/build
+# IDE
+.vscode/
+.idea/
+# Media/Backups
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.bak
+*.db
+*.sqlite
+*.log
+# Misc
+*.swp
+*.swo
+# Ignore database dumps
+*.sql
