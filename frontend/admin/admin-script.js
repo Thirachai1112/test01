@@ -12,7 +12,7 @@ let currentRepairPage = 1;
 const repairLogsPerPage = 10;
 let allRepairLogs = [];
 let filteredRepairLogs = [];
-const API_BASE = window.location.origin;
+const API_BASE = 'https://test01-production-1af7.up.railway.app';
 
 const NOTIFICATION_POLL_MS = 15000;
 const NOTIFICATION_STORAGE_KEY = 'adminRealtimeNotificationStateV1';

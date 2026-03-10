@@ -1,3 +1,5 @@
+
+const CONFIG = { API_BASE: 'https://test01-production-1af7.up.railway.app' };
 let allDevices = [];
 let filteredDevices = [];
 let currentPage = 1;

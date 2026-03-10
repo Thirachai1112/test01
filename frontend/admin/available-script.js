@@ -1,5 +1,5 @@
 const CONFIG = {
-    API_BASE: window.location.origin
+    API_BASE: 'https://test01-production-1af7.up.railway.app'
 };
 
 // เก็บสถานะการแบ่งหน้า

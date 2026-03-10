@@ -1,4 +1,4 @@
-const API_BASE = window.location.origin;
+const API_BASE = 'https://test01-production-1af7.up.railway.app';
 let allItems = [];
 let filteredItems = [];
 let currentFilter = 'all';
