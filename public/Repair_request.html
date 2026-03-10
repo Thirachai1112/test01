@@ -19,6 +19,10 @@
     <nav class="bg-gradient-to-r from-blue-700 to-blue-500 text-white py-3 shadow-lg sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
             <div class="flex items-center space-x-3 group cursor-pointer">
+                <!-- <div
+                    class="w-10 h-10 bg-white rounded-xl shadow-inner flex items-center justify-center transform group-hover:rotate-12 transition duration-300">
+                    <i class="fas fa-tools text-blue-600 text-lg"></i>
+                </div> -->
                 <div>
                     <h1 class="text-xl font-bold tracking-tight leading-none">IT SERVICE Repair.</h1>
                     <p class="text-[10px] text-blue-100 uppercase tracking-widest">Maintenance System</p>
@@ -26,7 +30,7 @@
             </div>
 
             <div class="flex items-right space-x-2">
-                <a href="index.html"
+                <a href="/Default.html"
                     class="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 py-2 px-5 rounded-lg backdrop-blur-sm transition duration-300 text-sm font-medium">
                     <i class="fas fa-home text-xs"></i>
                     <span>กลับหน้าหลัก</span>
@@ -63,6 +67,8 @@
                     <input type="text" name="asset_number" required
                         class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
+
+
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -86,6 +92,8 @@
                         class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 outline-none">
                 </div>
             </div>
+
+
 
             <div>
                 <label class="block mb-1 font-semibold">อาการเสีย/ปัญหาที่พบ</label>
@@ -113,17 +121,26 @@
         </form>
     </div>
 
+
+
     <footer class="bg-slate-900 text-slate-300 py-12 mt-20">
         <div class="max-w-6xl mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div class="flex items-center space-x-3">
+
                     <i class="fas fa-tools text-white"></i>
                 </div>
                 <span class="text-xl font-bold text-white tracking-tight"></span>
             </div>
+
+
+        </div>
         </div>
     </footer>
 
+
+
+</body>
 <script>
   // 1. ฟังก์ชันแสดงรูปตัวอย่าง (Image Preview)
 document.getElementById('repair_files').addEventListener('change', function(e) {
@@ -161,9 +178,78 @@ async function submitRepairForm(event) {
     formData.append('brand', getVal('brand_model'));
     formData.append('serial_number', getVal('serial_number'));
     formData.append('contract_number', getVal('contract_number'));
-    // ...existing code...
+    formData.append('asset_number', getVal('asset_number'));
+    formData.append('employee_name', getVal('employee_name'));
+    formData.append('employees_code', getVal('employees_code'));
+    formData.append('affiliation', getVal('affiliation'));
+    formData.append('phone_number', getVal('phone_number'));
+    formData.append('problem', getVal('problem'));
+    formData.append('status', getVal('status'));
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('id')) {
+        formData.append('item_id', urlParams.get('id'));
+    }
+
+    const fileInput = document.getElementById('repair_files');
+    if (fileInput && fileInput.files.length > 0) {
+        for (let i = 0; i < fileInput.files.length; i++) {
+            formData.append('files', fileInput.files[i]);
+        }
+    }
+
+    try {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+        Swal.fire({
+            title: 'กำลังส่งข้อมูล...',
+            text: 'กรุณารอสักครู่',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        const response = await fetch('/api/repair', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+        const result = await response.json();
+
+        if (result.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'ส่งข้อมูลสำเร็จ!',
+                text: 'ระบบได้รับข้อมูลการแจ้งซ่อมเรียบร้อยแล้ว',
+                confirmButtonText: 'ตกลง',
+                confirmButtonColor: '#3085d6',
+                allowOutsideClick: false,
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    // --- ทำการ Refresh หน้าจอใหม่ทั้งหมด ---
+                    location.reload(); 
+                }
+            });
+        } else {
+            throw new Error(result.message || 'บันทึกไม่สำเร็จ');
+        }
+    } catch (err) {
+        console.error(err);
+        Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: err.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้',
+        });
+        // เปิดปุ่มให้กดใหม่หากเกิดข้อผิดพลาด
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
 }
+
+
 </script>
 
-</body>
 </html>
