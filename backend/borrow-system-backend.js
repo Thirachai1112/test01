@@ -56,7 +56,13 @@ app.use('/uploads/borrowing', express.static(path.join(__dirname, 'uploads/borro
 app.use('/uploads/reports', express.static(path.join(__dirname, 'uploads/reports')));
 app.use('/qrcodes', express.static(path.join(__dirname, 'generated_qrcodes')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://test01-fvl3wnidz-thirachai1112s-projects.vercel.app',
+        'https://test01-production-1af7.up.railway.app'
+    ],
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
