@@ -1,3 +1,4 @@
+const API_BASE = 'https://test01-production-1af7.up.railway.app';
 const CONFIG = {
     API_BASE: window.location.origin
 };
