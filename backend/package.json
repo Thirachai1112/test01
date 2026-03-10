@@ -4,8 +4,8 @@
   "main": "borrow-system-backend.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon borrow-system-backend.js",
-    "dev": "nodemon index.js"
+    "start": "node borrow-system-backend.js",
+    "dev": "nodemon borrow-system-backend.js"
   },
   "keywords": [],
   "author": "",
